@@ -24,6 +24,8 @@
  * THE SOFTWARE.
  */
 
+// modified for use with SIDKick!
+
 #if defined(__IMXRT1052__) || defined(__IMXRT1062__)
 #ifndef output_mqs_h_
 #define output_mqs_h_

@@ -25,6 +25,8 @@
  */
 // Frank B
 
+// modified for use with SIDKick!
+
 #if defined(__IMXRT1052__) || defined(__IMXRT1062__)
 #include <Arduino.h>
 #include "output_mqs.h"

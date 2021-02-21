@@ -26,6 +26,8 @@
 
 //Adapted to PT8211, Frank Bösing.
 
+// modified for use with SIDKick!
+
 #ifndef output_pt8211_h_
 #define output_pt8211_h_
 
