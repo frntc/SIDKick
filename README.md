@@ -3,7 +3,8 @@
   <b> .- the only complete SID-drop-in-replacement that you can build yourself -. </b><br><br>
 </p>
 
-SIDKick is a drop-in replacement for the SID 6581 and 8580 used in C64s and C128s based on a Teensy 4.1. It emulates two SIDs and Sound Expander/FM at the same time, and makes no compromises with regard to quality: the emulation is based on reSID and fmOPL. It also comes with a few extras.
+SIDKick is a drop-in replacement for the SID 6581 and 8580 used in C64s and C128s based on a Teensy 4.1. 
+It emulates two SIDs and a Sound Expander/FM at the same time. It makes no compromises with regard to quality: the emulation is based on reSID and fmOPL. It also comes with a few extras.
 
 Currently its features include:
 -	6581 and/or 8580 emulation based on reSID 0.16 or reSID 1.0 (configurable)
@@ -22,12 +23,12 @@ Currently its features include:
 
 ## How to build a SIDKick:
 
-There are two versions of the PCB which differ only in the placement of components: for C64 longboards (v0.3, left) and for C64 shortboards (v0.3s, right).
-I prepared the latter as the SIDKick+Teensy combination otherwise barely fits below the keyboard in flat C64c cases unless you use low-profile sockets/pinheaders. 
+There are two versions of the PCB which differ only in the placement of components: for C64 longboards (v0.3, left) and C64 shortboards (v0.3s, right).
+I prepared the latter as the SIDKick+Teensy combination otherwise barely fits below the keyboard in flat C64c cases unless you use low-profile sockets and pin headers. 
 
 Both versions fit into a C128; installing in a C128D requires removing and standoff below the power supply and gently lifting it (same as with other dual SID options).
 
-As I only own PAL machines, I have not tested SIDKick in any NTSC C64 or C128. It should work if the clock frequency (in the firmware code) is set properly.
+As I only own PAL machines, I have not tested SIDKick in any NTSC C64 or C128. It should work fine if the clock frequency in the firmware code is set accordingly.
 
 Here you can find the BOM and assembly information for
 [SIDKick v0.3](https://htmlpreview.github.io/?https://github.com/frntc/SIDKick/blob/main/BOM/BOM_SIDKick_v03.html) and
@@ -36,7 +37,7 @@ Note: if you plan to use the MQS-output only, you can skip all SMD-parts outside
 
 ## Firmware Building and Uploading:
 
-Prebuild binaries are available in the release package. Read on for flashing and patching.
+Pre-build binaries are available in the release package. Read on for flashing and patching.
 
 The firmware is built with [Teensyduino](https://www.pjrc.com/teensy/teensyduino.html). Note that there are two defines in the code which need to be set properly: compiling the firmware for C128 (#define FIRMWARE_C128), and choosing the output (MQS vs. DAC, #define audioDevice). The compile settings are: "Board: Teensy 4.1", "CPU-Speed: 816 MHz", and "Optimize: Fastest". You can use lower clock frequencies (600 MHz, 720 MHz) when adjusting TEENSY_CLOCK in the code (816 MHz has been tested most, at lower speeds the emulation might not be cycle exact). 
 
@@ -46,7 +47,7 @@ IMPORTANT: if the SIDKick is already installed you must not close the power-from
 
 There is a second Teensyduino-sketch (SIDKickEEPROM) which initializes the SIDKick-configuration stored in the EEPROM of the Teensy.
 
-I made a very simple (and not very comfortable to use) command line tool to path the hex-files. This is required if you want to add PRGs to the launcher in the menu. I provide a batch file for Windows, a script for Linux users, and an example list of PRGs to demonstrate the patching. Upload the patched firmware then using the Teensyloader.
+I made a very simple (and not very comfortable to use) command-line tool to patch the hex-file. Patching is required if you want to add PRGs to the menu launcher. I provide a batch file for Windows, a script for Linux users, and an example PRG-list. Upload the patched firmware afterwards using the Teensyloader.
 
 ### Recommended Procedure: 
 -	flash and run SIDKickEEPROM
