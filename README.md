@@ -28,7 +28,7 @@ I prepared the latter as the SIDKick+Teensy combination otherwise barely fits be
 
 Both versions fit into a C128; installing in a C128D requires removing and standoff below the power supply and gently lifting it (same as with other dual SID options).
 
-As I only own PAL machines, I have not tested SIDKick in any NTSC C64 or C128. It should work fine if the clock frequency in the firmware code is set accordingly.
+As I only own PAL machines, I have not tested SIDKick in any real NTSC C64 or C128. However, I succesfully tested SIDKick in a C64 with custom clock frequency between 0.93275MHz and 1.03279MHz. Thus it should work fine if the clock frequency value in the firmware code is set accordingly.
 
 Here you can find the BOM and assembly information for
 [SIDKick v0.3](https://htmlpreview.github.io/?https://github.com/frntc/SIDKick/blob/main/BOM/BOM_SIDKick_v03.html) and
