@@ -1,6 +1,6 @@
 <p align="center" font-size: 30px;>
   <img src="Images/SIDKick_logo.png" height="120"> <br>
-  <b> .-the only complete SID-drop-in-replacement that you can build yourself-. </b><br><br>
+  <b> .- the only complete SID-drop-in-replacement that you can build yourself -. </b><br><br>
 </p>
 
 SIDKick is a drop-in replacement for the SID 6581 and 8580 used in C64s and C128s based on a Teensy 4.1. It emulates two SIDs and Sound Expander/FM at the same time, and makes no compromises with regard to quality: the emulation is based on reSID and fmOPL. It also comes with a few extras.
@@ -38,7 +38,7 @@ Note: if you plan to use the MQS-output only, you can skip all SMD-parts outside
 
 Prebuild binaries are available in the release package. Read on for flashing and patching.
 
-The firmware is built with [Teensyduino](https://www.pjrc.com/teensy/teensyduino.html). Note that there are two defines in the code which need to be set properly: compiling the firmware for C128, and choosing the output (MQS vs. DAC). Also the clock frequency of the Teensy needs to be set to 816 MHz (you can use lower clock frequencies when adjusting TEENSY_CLOCK in the code, but 816 MHz has been tested most). 
+The firmware is built with [Teensyduino](https://www.pjrc.com/teensy/teensyduino.html). Note that there are two defines in the code which need to be set properly: compiling the firmware for C128 (#define FIRMWARE_C128), and choosing the output (MQS vs. DAC, #define audioDevice). The compile settings are: "Board: Teensy 4.1", "CPU-Speed: 816 MHz", and "Optimize: Fastest". You can use lower clock frequencies (600 MHz, 720 MHz) when adjusting TEENSY_CLOCK in the code (816 MHz has been tested most, at lower speeds the emulation might not be cycle exact). 
 
 You can upload the firmware directly from the Arduino IDE or use the Teensyloader to flash hex-files. To upload the firmware you need to connect the Teensy to your PC using USB. 
 
