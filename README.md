@@ -39,7 +39,12 @@ Note: if you plan to use the MQS-output only, you can skip all SMD-parts outside
 
 Pre-build binaries are available in the release package. Read on for flashing and patching.
 
-The firmware is built with [Teensyduino](https://www.pjrc.com/teensy/teensyduino.html). Note that there are two defines in the code which need to be set properly: compiling the firmware for C128 (#define FIRMWARE_C128), and choosing the output (MQS vs. DAC, #define audioDevice). The compile settings are: "Board: Teensy 4.1", "CPU-Speed: 816 MHz", and "Optimize: Fastest". You can use lower clock frequencies (600 MHz, 720 MHz) when adjusting TEENSY_CLOCK in the code (816 MHz has been tested most, at lower speeds the emulation might not be cycle exact). 
+The firmware is built with [Teensyduino](https://www.pjrc.com/teensy/teensyduino.html). Note that there are three defines in the code which need to be set properly: 
+- when compiling the firmware for C128: #define FIRMWARE_C128
+- choosing the output (MQS vs. DAC): #define audioDevice
+- folder where you store the SIDKick project: #define SIDKICK_SOURCE_DIR 
+
+The compile settings are: "Board: Teensy 4.1", "CPU-Speed: 816 MHz", and "Optimize: Fastest". You can use lower clock frequencies (600 MHz, 720 MHz) when adjusting TEENSY_CLOCK in the code (816 MHz has been tested most, at lower speeds the emulation might not be cycle exact). 
 
 You can upload the firmware directly from the Arduino IDE or use the Teensyloader to flash hex-files. To upload the firmware you need to connect the Teensy to your PC using USB. 
 
