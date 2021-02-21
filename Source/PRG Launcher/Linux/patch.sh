@@ -1,0 +1,1 @@
+objcopy -I ihex SIDKick.ino.TEENSY41.hex -O binary SIDKick.ino.bin ; gcc -Wall SIDKickLauncher.cpp -o SIDKickLauncher; ./SIDKickLauncher ; objcopy -I binary SIDKick_Launcher.ino.bin -O ihex SIDKick_Launcher.hex
