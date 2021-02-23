@@ -4,7 +4,7 @@
 </p>
 
 SIDKick is a drop-in replacement for the SID sound chips used in C64s and C128s based on a Teensy 4.1. 
-It is able to emulate two SIDs (6581 and 8580) and a Sound Expander (offering Yamaha OPL-based FM sound) at the same time. It makes no compromises with regard to quality: the emulation is based on reSID and fmOPL. It also comes with a few extras.
+It is able to emulate two SIDs (6581 and/or 8580) and a Sound Expander (offering Yamaha OPL-based FM sound) at the same time. It makes no compromises with regard to quality: the emulation is based on reSID and fmOPL. It also comes with a few extras.
 
 Currently its features include:
 -	6581 and/or 8580 emulation based on reSID 0.16 or reSID 1.0 (configurable)
