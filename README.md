@@ -18,7 +18,7 @@ Currently its features include:
 -	output available at connectors (stereo) or routed through the mainboard (mono)
 
 <p align="center" font-size: 30px;>
-<img src="Images/SIDKick_v03.jpg" height="250">  <img src="Images/SIDKick_menu.jpg" height="250">  
+<img src="Images/SIDKicks.jpg" height="200">  <img src="Images/SIDKick_v03.jpg" height="200">  <img src="Images/SIDKick_menu.jpg" height="200">  
 </p>
 
 ## How to build a SIDKick:
