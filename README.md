@@ -42,17 +42,17 @@ Pre-built binaries are available in the release package. Read on for flashing an
 The firmware is built with [Teensyduino](https://www.pjrc.com/teensy/teensyduino.html). Note that there are three defines in the code which need to be set properly: 
 - when compiling the firmware for C128: #define FIRMWARE_C128
 - choosing the output (MQS vs. DAC): #define audioDevice
-- folder where you store the SIDKick project: #define SIDKICK_SOURCE_DIR 
+- set folder where you store the SIDKick project: #define SIDKICK_SOURCE_DIR 
 
 The compile settings are: "Board: Teensy 4.1", "CPU-Speed: 816 MHz", and "Optimize: Fastest". You may also choose a lower clock frequency of 600 MHz or 720 MHz as long as you adjust TEENSY_CLOCK in the code accordingly. During most tests SIDKick was running at 816 MHz (at lower speeds the emulation might not always be cycle exact). 
 
-You can upload the firmware directly from the Arduino IDE or use the Teensyloader to flash hex-files. To upload the firmware you need to connect the Teensy to your PC using USB. 
+You can upload the firmware(s) directly from the Arduino IDE or use the Teensyloader to flash hex-files. To upload the firmware you need to connect the Teensy to your PC using USB. 
 
 IMPORTANT: if the SIDKick is already installed you must not close the power-from-mainboard jumper (see below) and connect USB at the same time – unless you followed these [instructions](https://www.pjrc.com/teensy/external_power.html).
 
-There is a second Teensyduino-sketch (SIDKickEEPROM) which initializes the SIDKick-configuration stored in the EEPROM of the Teensy.
+I made a very simple (and not very comfortable to use) command-line tool to patch the firmware-hex-file prior to uploading. Patching is required if you want to add PRGs to the menu launcher. I provide a batch file for Windows, a script for Linux users, and an example PRG-list. Upload the patched firmware afterwards using the Teensyloader.
 
-I made a very simple (and not very comfortable to use) command-line tool to patch the hex-file. Patching is required if you want to add PRGs to the menu launcher. I provide a batch file for Windows, a script for Linux users, and an example PRG-list. Upload the patched firmware afterwards using the Teensyloader.
+Prior to flashing the actual firmware, I recommend to run the EEPROM Eraser tool (the second Teensyduino-sketch SIDKickEEPROM). It initializes the SIDKick-configuration stored in the EEPROM of the Teensy.
 
 ### Recommended Procedure: 
 -	flash and run SIDKickEEPROM
