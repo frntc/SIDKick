@@ -128,6 +128,8 @@ toms01 for making me start this project and lots of testing; emulaThor for proof
 
 There have been previous attempts of making drop-in replacements based on a Teensy which deserve being mentioned, e.g. [Teensy-reSID](https://github.com/FrankBoesing/Teensy-reSID) and [6581-SID-teensy](https://github.com/kokotisp/6581-SID-teensy). However, both are far from a complete replacement, and, for various reasons, were not suitable as a basis for SIDKick.
 
+Thanks for reading until the very end. I'd be happy to hear from you if you decide to build your own SIDKick!
+
 ## Trademarks
 
 Teensy is a trademark of PJRC.COM LLC.
