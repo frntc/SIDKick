@@ -33,7 +33,7 @@ As I only own PAL machines, I have not tested SIDKick in any real NTSC C64 or C1
 Here you can find the BOM and assembly information for
 [SIDKick v0.3](https://htmlpreview.github.io/?https://github.com/frntc/SIDKick/blob/main/BOM/BOM_SIDKick_v03.html) and
 [SIDKick v0.3s](https://htmlpreview.github.io/?https://github.com/frntc/SIDKick/blob/main/BOM/BOM_SIDKick_v03s.html) 
-Note: if you plan to use the MQS-output only, you can skip all SMD-parts outside of the SID-/Teensy-sockets.
+Note: if you plan to use the MQS-output only, you can skip all SMD-parts outside of the SID-/Teensy-sockets (C101-109, R101-107, U2, U6).
 
 ## Firmware Building and Uploading:
 
@@ -124,7 +124,7 @@ The PCBs are work licensed under a Creative Commons Attribution-NonCommercial-Sh
 ## Misc
 
 Last but not least I would like to thank a few people and give proper credits:
-toms01 for making me start this project and intensive testing; androSID for hinting to the opamp; emulaThor and bigby for even more testing and extensive feedback. [Retrofan](https://compidiaries.wordpress.com/) for the SIDKick-logo and his font which is used in the configuration tool. And of course, the authors of reSID and the OPL emulation. 
+toms01 for making me start this project and lots of testing; emulaThor for proof reading and continuous git-care. emulaThor and bigby for even more testing and extensive feedback. androSID for hinting to the opamp; [Retrofan](https://compidiaries.wordpress.com/) for the SIDKick-logo and his font which is used in the configuration tool. And of course, the authors of reSID and the OPL emulation. 
 
 There have been previous attempts of making drop-in replacements based on a Teensy which deserve being mentioned, e.g. [Teensy-reSID](https://github.com/FrankBoesing/Teensy-reSID) and [6581-SID-teensy](https://github.com/kokotisp/6581-SID-teensy). However, both are far from a complete replacement, and, for various reasons, were not suitable as a basis for SIDKick.
 
