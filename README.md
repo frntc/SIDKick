@@ -18,7 +18,7 @@ Currently its features include:
 -	output available at connectors (stereo) or routed through the mainboard (mono)
 
 <p align="center" font-size: 30px;>
-<img src="Images/SIDKicks.jpg" height="200">  <img src="Images/SIDKick_v03.jpg" height="200">  <img src="Images/SIDKick_menu.jpg" height="200">  
+<img src="https://raw.githubusercontent.com/frntc/SIDKick/master/Images/SIDKicks.jpg" height="180">  <img src="https://raw.githubusercontent.com/frntc/SIDKick/master/Images/SIDKick_v03.jpg" height="180">  <img src="https://raw.githubusercontent.com/frntc/SIDKick/master/Images/SIDKick_menu.jpg" height="180">  
 </p>
 
 ## How to build a SIDKick:
@@ -87,14 +87,14 @@ You can choose to only emulate a single SID. If you want to use a second SID, or
 The photographs show various locations where these signals can be tapped, e.g. A5 and A8 are conveniently available on the mainboards (see photo of ASSY 250469) and at the ROMs (not shown on the photos: on the 250469 at the kernal ROM 251913 at pin 5 and 29).
 
 <p align="center" font-size: 30px;>
-<img src="Images/326.jpg" height="160"> 
-<img src="Images/469.jpg" height="160">  
-<img src="Images/c128.jpg" height="160">  
-<img src="Images/expport.jpg" height="160">  
+<img src="https://raw.githubusercontent.com/frntc/SIDKick/master/Images/326.jpg" height="160"> 
+<img src="https://raw.githubusercontent.com/frntc/SIDKick/master/Images/469.jpg" height="160">  
+<img src="https://raw.githubusercontent.com/frntc/SIDKick/master/Images/c128.jpg" height="160">  
+<img src="https://raw.githubusercontent.com/frntc/SIDKick/master/Images/expport.jpg" height="160">  
 </p>
  
 ### Audio Output
-<img align="right" width="160" height="160" src="Images/SIDKick_ortho.jpg">
+<img align="right" width="160" height="160" src="https://raw.githubusercontent.com/frntc/SIDKick/master/Images/SIDKick_ortho.jpg">
 
 Lastly you need to choose how to output the sound (recall that the firmware determines whether MQS or DAC output is used). You can either use the solder jumper (labelled "MQS DAC" and connect the left-center or center-right to route mono-audio through the mainboard. The better option is to take the output from the pins labelled R GND L (for DAC) or MQS L/R and GNG (for MQS).
 
