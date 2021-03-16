@@ -32,8 +32,9 @@ As I only own PAL machines, I have not tested SIDKick in any real NTSC C64 or C1
 
 Here you can find the BOM and assembly information for
 [SIDKick v0.3](https://htmlpreview.github.io/?https://github.com/frntc/SIDKick/blob/main/BOM/BOM_SIDKick_v03.html) and
-[SIDKick v0.3s](https://htmlpreview.github.io/?https://github.com/frntc/SIDKick/blob/main/BOM/BOM_SIDKick_v03s.html) 
-Note: if you plan to use the MQS-output only, you can skip all SMD-parts outside of the SID-/Teensy-sockets (C101-109, R101-107, U2, U6).
+[SIDKick v0.3s](https://htmlpreview.github.io/?https://github.com/frntc/SIDKick/blob/main/BOM/BOM_SIDKick_v03s.html).
+Note: the first version of the BOMs accidentally listed 74LS245 in the BOM-table and showed 74LVC245 on the PCB. Correct is 74LVC245! 
+If you plan to use the MQS-output only, you can skip all SMD-parts outside of the SID-/Teensy-sockets (C101-109, R101-107, U2, U6).
 
 ## Firmware Building and Uploading:
 
