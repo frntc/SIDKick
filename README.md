@@ -36,6 +36,18 @@ Here you can find the BOM and assembly information for
 Note: the first version of the BOMs accidentally listed 74LS245 in the BOM-table and showed 74LVC245 on the PCB. Correct is 74LVC245! 
 If you plan to use the MQS-output only, you can skip all SMD-parts outside of the SID-/Teensy-sockets (C101-109, R101-107, U2, U6).
 
+#### Build instructions
+
+The first step is soldering the surface-mount components (top side first). Next solder the pin header for the SID-socket on the bottom of the PCB. I recommend to put them into a breadboard to properly align and hold them in place (as you can see on the image, 4 pins on the left side can be left out). After soldering the pin headers, cut the protruding tips. Lastly, solder the socket for the Teensy (again, fixate the pin connector strips to align them) and the connectors for DAC and/or MQS output and address/IO lines.
+
+<p align="center" font-size: 30px;>
+<img src="https://raw.githubusercontent.com/frntc/SIDKick/master/Images/SIDKick_build1.jpg" height="100">   
+<img src="https://raw.githubusercontent.com/frntc/SIDKick/master/Images/SIDKick_build2.jpg" height="100">   
+<img src="https://raw.githubusercontent.com/frntc/SIDKick/master/Images/SIDKick_build3.jpg" height="100">   
+<img src="https://raw.githubusercontent.com/frntc/SIDKick/master/Images/SIDKick_build4.jpg" height="100">   
+</p>
+
+
 ## Firmware Building and Uploading:
 
 Pre-built binaries are available in the release package. Read on for flashing and patching.
