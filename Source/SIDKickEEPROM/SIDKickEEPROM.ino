@@ -29,22 +29,56 @@
 
 #include <EEPROM.h>
 
-uint8_t stateConfig[ 20 * 10 + 1 ];
+const unsigned char defaultSettings[ 64 ] = { 
+  2,  // SID #1
+  12, // Digiboost
+  1,  // Register Read
+  15, // volume
+  7,  // panning
+  90, // passband
+  7,  // gain
+  60, // filter bias
+   3, // sid #2
+  12, // digiboost
+   0, // address
+  15, // vol
+   7, // panning
+  90, // passband
+  7,  // gain
+  60, // filter bias
+   0, // Sound Expander
+  15, // vol
+   7, // panning
+   1, // reSID version
+   2, // LED mode
+   7, // #LEDs 
+   8, // Window
+  15, // Scale
+   1, // Color Cycle Speed
+   0, // H
+  31, // S
+  31, // V
+  45, // H 
+  31, // S
+  31, // V
+   0, // MIDI
+   0, // MIDI input enabled?
+   0, // SID+FM Delay
+   0, // Delay sign
+   7, // SAM
+   0, 0, 0, 0, 0, 0, 0, 0,
+   0, 0, 0, 0, 0, 0, 0, 0,
+   0, 0, 0, 0, 0, 0, 0, 0, 
+   0, 0, 0, 0 };
 
 void setup()
 {
-  uint8_t defaultSettings[ 20 ] = { 2, 12, 0, 15,  7, 90,  7,  55, 3, 12, 0, 15, 7, 90,  7,  55, 0, 15, 7, 1 };
+  for (int i = 0; i < 64 * 10; i++)
+    EEPROM.write( i, defaultSettings[ i % 64 ] );
 
-  // yes I know I could directly call EEPROM.write, but this is copy-paste
-  for (int i = 0; i < 20 * 10; i++)
-    stateConfig[ i ] = defaultSettings[ i % 20 ];
-
-  stateConfig[ 200 ] = 0;
-  
-  for (int i = 0; i < 20 * 10 + 1; i++)
-    EEPROM.write( i, stateConfig[ i ] );
+  for (int i = 0; i < 64; i++)
+    EEPROM.write( 640 + i, 0 );
 }
-
 
 void loop()
 {
