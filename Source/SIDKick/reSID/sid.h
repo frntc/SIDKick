@@ -49,6 +49,9 @@ public:
   void clock();
   void clock(cycle_count delta_t);
   int clock(cycle_count& delta_t, short* buf, int n, int interleave = 1);
+  void clock_pp1();
+  void clock_pp2(cycle_count delta_t);
+
   void reset();
 
   // Read/write registers.

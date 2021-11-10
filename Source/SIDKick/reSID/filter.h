@@ -17,6 +17,8 @@
 //  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 //  ---------------------------------------------------------------------------
 
+// please note: there are some modifications in this file to be used with SIDKick!
+
 #ifndef RESID_FILTER_H
 #define RESID_FILTER_H
 
@@ -26,10 +28,15 @@ RESID_NAMESPACE_START
 
 #define FLOAT float
 #define PRECALC_TABLES
-//#define SUB_SAMPLE_PRE  128
-//#define SUB_SAMPLE_GAIN  64
+#ifdef HIGH_PRECISION_TABLES
 #define SUB_SAMPLE_PRE  4
+#define SUB_SAMPLE_PRE2  4
 #define SUB_SAMPLE_GAIN  4
+#else
+#define SUB_SAMPLE_PRE  128
+#define SUB_SAMPLE_PRE2  128
+#define SUB_SAMPLE_GAIN  64
+#endif
 
 // ----------------------------------------------------------------------------
 // The SID filter is modeled with a two-integrator-loop biquadratic filter,
@@ -555,7 +562,16 @@ public:
   // SID audio output (16 bits).
   short output();
 
+  // CD compute mixer input, but do not apply mixer/gain yet
+  void prepare_output();
+  void process_output_step1();
+  void process_output_step2();
+  short get_output();
+
 protected:
+
+  int mixerInput;
+  int gainInput;
 
   void set_sum_mix();
   void set_w0();
@@ -687,6 +703,7 @@ friend class SID;
 RESID_INLINE
 void Filter::clock(int voice1, int voice2, int voice3)
 {
+  #if 0
   model_filter_t& f = model_filter[sid_model];
 
   v1 = (voice1*f.voice_scale_s14 >> 18) + f.voice_DC;
@@ -775,8 +792,9 @@ void Filter::clock(int voice1, int voice2, int voice3)
     // MOS 8580.
     Vlp = solve_integrate_8580(1, Vbp, Vlp_x, Vlp_vc, f);
     Vbp = solve_integrate_8580(1, Vhp, Vbp_x, Vbp_vc, f);
-    Vhp = f.summer[(offset + resonance[res][Vbp/SUB_SAMPLE_PRE] + Vlp + Vi)/SUB_SAMPLE_PRE];
+    Vhp = f.summer[((offset + resonance[res][Vbp/SUB_SAMPLE_PRE] + Vlp + Vi)/SUB_SAMPLE_PRE)];
   }
+  #endif
 }
 
 // ----------------------------------------------------------------------------
@@ -882,9 +900,11 @@ void Filter::clock(cycle_count delta_t, int voice1, int voice2, int voice3)
       }
 
       // Calculate filter outputs.
+      int tmp = solve_integrate_6581(delta_t_flt, Vhp, Vbp_x, Vbp_vc, f);
+      __builtin_prefetch( &f.gain[_8_div_Q][tmp/(SUB_SAMPLE_GAIN)] );
       Vlp = solve_integrate_6581(delta_t_flt, Vbp, Vlp_x, Vlp_vc, f);
-      Vbp = solve_integrate_6581(delta_t_flt, Vhp, Vbp_x, Vbp_vc, f);
-      Vhp = f.summer[(offset + f.gain[_8_div_Q][Vbp/(SUB_SAMPLE_GAIN)] + Vlp + Vi)/SUB_SAMPLE_PRE];
+      Vbp = tmp; //solve_integrate_6581(delta_t_flt, Vhp, Vbp_x, Vbp_vc, f);
+      Vhp = f.summer[(offset + f.gain[_8_div_Q][Vbp/(SUB_SAMPLE_GAIN)] + Vlp + Vi)/SUB_SAMPLE_PRE2];
       delta_t -= delta_t_flt;
     }
   }
@@ -896,9 +916,11 @@ void Filter::clock(cycle_count delta_t, int voice1, int voice2, int voice3)
       }
 
       // Calculate filter outputs.
+      int tmp = solve_integrate_8580(delta_t_flt, Vhp, Vbp_x, Vbp_vc, f);
+      __builtin_prefetch( &resonance[res][tmp/SUB_SAMPLE_PRE] );
       Vlp = solve_integrate_8580(delta_t_flt, Vbp, Vlp_x, Vlp_vc, f);
-      Vbp = solve_integrate_8580(delta_t_flt, Vhp, Vbp_x, Vbp_vc, f);
-      Vhp = f.summer[(offset + resonance[res][Vbp/SUB_SAMPLE_PRE] + Vlp + Vi)/SUB_SAMPLE_PRE];
+      Vbp = tmp; //solve_integrate_8580(delta_t_flt, Vhp, Vbp_x, Vbp_vc, f);
+      Vhp = f.summer[(offset + resonance[res][Vbp/SUB_SAMPLE_PRE] + Vlp + Vi)/SUB_SAMPLE_PRE2];
 
       delta_t -= delta_t_flt;
     }
@@ -956,6 +978,603 @@ for my $mix (0..2**@i-1) {
   // Sum inputs routed into the mixer.
   int Vi = 0;
   int offset = 0;
+
+  //int t = mix & 0x7f;
+  int o = 0;
+
+  if ( mix & 0x01 ) { Vi += v1; o ++; }
+  if ( mix & 0x02 ) { Vi += v2; o ++; }
+  if ( mix & 0x04 ) { Vi += v3; o ++; }
+  if ( mix & 0x08 ) { Vi += ve; o ++; }
+  if ( mix & 0x10 ) { Vi += Vlp; o ++; }
+  if ( mix & 0x20 ) { Vi += Vbp; o ++; }
+  if ( mix & 0x40 ) { Vi += Vhp; o ++; }
+
+  const unsigned int offsets[] = { 0, 1, 65537, 196609, 393217, 655361, 983041, 1376257 };
+  offset = offsets[ o ];
+  
+/*  switch (mix & 0x7f) {
+  case 0x00:
+    Vi = 0;
+    offset = mixer_offset<0>::value;
+    break;
+  case 0x01:
+    Vi = v1;
+    offset = mixer_offset<1>::value;
+    break;
+  case 0x02:
+    Vi = v2;
+    offset = mixer_offset<1>::value;
+    break;
+  case 0x03:
+    Vi = v2 + v1;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x04:
+    Vi = v3;
+    offset = mixer_offset<1>::value;
+    break;
+  case 0x05:
+    Vi = v3 + v1;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x06:
+    Vi = v3 + v2;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x07:
+    Vi = v3 + v2 + v1;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x08:
+    Vi = ve;
+    offset = mixer_offset<1>::value;
+    break;
+  case 0x09:
+    Vi = ve + v1;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x0a:
+    Vi = ve + v2;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x0b:
+    Vi = ve + v2 + v1;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x0c:
+    Vi = ve + v3;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x0d:
+    Vi = ve + v3 + v1;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x0e:
+    Vi = ve + v3 + v2;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x0f:
+    Vi = ve + v3 + v2 + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x10:
+    Vi = Vlp;
+    offset = mixer_offset<1>::value;
+    break;
+  case 0x11:
+    Vi = Vlp + v1;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x12:
+    Vi = Vlp + v2;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x13:
+    Vi = Vlp + v2 + v1;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x14:
+    Vi = Vlp + v3;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x15:
+    Vi = Vlp + v3 + v1;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x16:
+    Vi = Vlp + v3 + v2;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x17:
+    Vi = Vlp + v3 + v2 + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x18:
+    Vi = Vlp + ve;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x19:
+    Vi = Vlp + ve + v1;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x1a:
+    Vi = Vlp + ve + v2;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x1b:
+    Vi = Vlp + ve + v2 + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x1c:
+    Vi = Vlp + ve + v3;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x1d:
+    Vi = Vlp + ve + v3 + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x1e:
+    Vi = Vlp + ve + v3 + v2;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x1f:
+    Vi = Vlp + ve + v3 + v2 + v1;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x20:
+    Vi = Vbp;
+    offset = mixer_offset<1>::value;
+    break;
+  case 0x21:
+    Vi = Vbp + v1;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x22:
+    Vi = Vbp + v2;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x23:
+    Vi = Vbp + v2 + v1;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x24:
+    Vi = Vbp + v3;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x25:
+    Vi = Vbp + v3 + v1;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x26:
+    Vi = Vbp + v3 + v2;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x27:
+    Vi = Vbp + v3 + v2 + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x28:
+    Vi = Vbp + ve;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x29:
+    Vi = Vbp + ve + v1;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x2a:
+    Vi = Vbp + ve + v2;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x2b:
+    Vi = Vbp + ve + v2 + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x2c:
+    Vi = Vbp + ve + v3;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x2d:
+    Vi = Vbp + ve + v3 + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x2e:
+    Vi = Vbp + ve + v3 + v2;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x2f:
+    Vi = Vbp + ve + v3 + v2 + v1;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x30:
+    Vi = Vbp + Vlp;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x31:
+    Vi = Vbp + Vlp + v1;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x32:
+    Vi = Vbp + Vlp + v2;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x33:
+    Vi = Vbp + Vlp + v2 + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x34:
+    Vi = Vbp + Vlp + v3;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x35:
+    Vi = Vbp + Vlp + v3 + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x36:
+    Vi = Vbp + Vlp + v3 + v2;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x37:
+    Vi = Vbp + Vlp + v3 + v2 + v1;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x38:
+    Vi = Vbp + Vlp + ve;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x39:
+    Vi = Vbp + Vlp + ve + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x3a:
+    Vi = Vbp + Vlp + ve + v2;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x3b:
+    Vi = Vbp + Vlp + ve + v2 + v1;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x3c:
+    Vi = Vbp + Vlp + ve + v3;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x3d:
+    Vi = Vbp + Vlp + ve + v3 + v1;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x3e:
+    Vi = Vbp + Vlp + ve + v3 + v2;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x3f:
+    Vi = Vbp + Vlp + ve + v3 + v2 + v1;
+    offset = mixer_offset<6>::value;
+    break;
+  case 0x40:
+    Vi = Vhp;
+    offset = mixer_offset<1>::value;
+    break;
+  case 0x41:
+    Vi = Vhp + v1;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x42:
+    Vi = Vhp + v2;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x43:
+    Vi = Vhp + v2 + v1;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x44:
+    Vi = Vhp + v3;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x45:
+    Vi = Vhp + v3 + v1;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x46:
+    Vi = Vhp + v3 + v2;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x47:
+    Vi = Vhp + v3 + v2 + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x48:
+    Vi = Vhp + ve;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x49:
+    Vi = Vhp + ve + v1;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x4a:
+    Vi = Vhp + ve + v2;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x4b:
+    Vi = Vhp + ve + v2 + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x4c:
+    Vi = Vhp + ve + v3;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x4d:
+    Vi = Vhp + ve + v3 + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x4e:
+    Vi = Vhp + ve + v3 + v2;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x4f:
+    Vi = Vhp + ve + v3 + v2 + v1;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x50:
+    Vi = Vhp + Vlp;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x51:
+    Vi = Vhp + Vlp + v1;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x52:
+    Vi = Vhp + Vlp + v2;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x53:
+    Vi = Vhp + Vlp + v2 + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x54:
+    Vi = Vhp + Vlp + v3;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x55:
+    Vi = Vhp + Vlp + v3 + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x56:
+    Vi = Vhp + Vlp + v3 + v2;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x57:
+    Vi = Vhp + Vlp + v3 + v2 + v1;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x58:
+    Vi = Vhp + Vlp + ve;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x59:
+    Vi = Vhp + Vlp + ve + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x5a:
+    Vi = Vhp + Vlp + ve + v2;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x5b:
+    Vi = Vhp + Vlp + ve + v2 + v1;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x5c:
+    Vi = Vhp + Vlp + ve + v3;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x5d:
+    Vi = Vhp + Vlp + ve + v3 + v1;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x5e:
+    Vi = Vhp + Vlp + ve + v3 + v2;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x5f:
+    Vi = Vhp + Vlp + ve + v3 + v2 + v1;
+    offset = mixer_offset<6>::value;
+    break;
+  case 0x60:
+    Vi = Vhp + Vbp;
+    offset = mixer_offset<2>::value;
+    break;
+  case 0x61:
+    Vi = Vhp + Vbp + v1;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x62:
+    Vi = Vhp + Vbp + v2;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x63:
+    Vi = Vhp + Vbp + v2 + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x64:
+    Vi = Vhp + Vbp + v3;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x65:
+    Vi = Vhp + Vbp + v3 + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x66:
+    Vi = Vhp + Vbp + v3 + v2;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x67:
+    Vi = Vhp + Vbp + v3 + v2 + v1;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x68:
+    Vi = Vhp + Vbp + ve;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x69:
+    Vi = Vhp + Vbp + ve + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x6a:
+    Vi = Vhp + Vbp + ve + v2;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x6b:
+    Vi = Vhp + Vbp + ve + v2 + v1;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x6c:
+    Vi = Vhp + Vbp + ve + v3;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x6d:
+    Vi = Vhp + Vbp + ve + v3 + v1;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x6e:
+    Vi = Vhp + Vbp + ve + v3 + v2;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x6f:
+    Vi = Vhp + Vbp + ve + v3 + v2 + v1;
+    offset = mixer_offset<6>::value;
+    break;
+  case 0x70:
+    Vi = Vhp + Vbp + Vlp;
+    offset = mixer_offset<3>::value;
+    break;
+  case 0x71:
+    Vi = Vhp + Vbp + Vlp + v1;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x72:
+    Vi = Vhp + Vbp + Vlp + v2;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x73:
+    Vi = Vhp + Vbp + Vlp + v2 + v1;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x74:
+    Vi = Vhp + Vbp + Vlp + v3;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x75:
+    Vi = Vhp + Vbp + Vlp + v3 + v1;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x76:
+    Vi = Vhp + Vbp + Vlp + v3 + v2;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x77:
+    Vi = Vhp + Vbp + Vlp + v3 + v2 + v1;
+    offset = mixer_offset<6>::value;
+    break;
+  case 0x78:
+    Vi = Vhp + Vbp + Vlp + ve;
+    offset = mixer_offset<4>::value;
+    break;
+  case 0x79:
+    Vi = Vhp + Vbp + Vlp + ve + v1;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x7a:
+    Vi = Vhp + Vbp + Vlp + ve + v2;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x7b:
+    Vi = Vhp + Vbp + Vlp + ve + v2 + v1;
+    offset = mixer_offset<6>::value;
+    break;
+  case 0x7c:
+    Vi = Vhp + Vbp + Vlp + ve + v3;
+    offset = mixer_offset<5>::value;
+    break;
+  case 0x7d:
+    Vi = Vhp + Vbp + Vlp + ve + v3 + v1;
+    offset = mixer_offset<6>::value;
+    break;
+  case 0x7e:
+    Vi = Vhp + Vbp + Vlp + ve + v3 + v2;
+    offset = mixer_offset<6>::value;
+    break;
+  case 0x7f:
+    Vi = Vhp + Vbp + Vlp + ve + v3 + v2 + v1;
+    offset = mixer_offset<7>::value;
+    break;
+  }*/
+
+  // Sum the inputs in the mixer and run the mixer output through the gain.
+  return (short)(f.gain[vol][f.mixer[(offset + Vi)/SUB_SAMPLE_PRE]/SUB_SAMPLE_GAIN] - (1 << 15));
+}
+
+RESID_INLINE
+void Filter::process_output_step1()
+{
+  model_filter_t& f = model_filter[sid_model];
+  __builtin_prefetch( &f.mixer[ mixerInput ] );
+}
+
+RESID_INLINE
+void Filter::process_output_step2()
+{
+  model_filter_t& f = model_filter[sid_model];
+  gainInput = f.mixer[mixerInput]/SUB_SAMPLE_GAIN;
+  __builtin_prefetch( &f.gain[vol][ gainInput ] );
+}
+
+RESID_INLINE
+short Filter::get_output()
+{
+  model_filter_t& f = model_filter[sid_model];
+  return (short)(f.gain[vol][gainInput] - (1 << 15));
+}
+
+RESID_INLINE
+void  Filter::prepare_output()
+{
+  //model_filter_t& f = model_filter[sid_model];
+
+  // Writing the switch below manually would be tedious and error-prone;
+  // it is rather generated by the following Perl program:
+
+  /*
+my @i = qw(v1 v2 v3 ve Vlp Vbp Vhp);
+for my $mix (0..2**@i-1) {
+    print sprintf("  case 0x%02x:\n", $mix);
+    my @sum;
+    for (@i) {
+        unshift(@sum, $_) if $mix & 0x01;
+        $mix >>= 1;
+    }
+    my $sum = join(" + ", @sum) || "0";
+    print "    Vi = $sum;\n";
+    print "    offset = mixer_offset<" . @sum . ">::value;\n";
+    print "    break;\n";
+}
+  */
+
+  // Sum inputs routed into the mixer.
+  int Vi = 0;
+  int offset = 0;
+
+  //int t = mix & 0x7f;
+/*  int o = 0;
+
+  if ( mix & 0x01 ) { Vi += v1; o ++; }
+  if ( mix & 0x02 ) { Vi += v2; o ++; }
+  if ( mix & 0x04 ) { Vi += v3; o ++; }
+  if ( mix & 0x08 ) { Vi += ve; o ++; }
+  if ( mix & 0x10 ) { Vi += Vlp; o ++; }
+  if ( mix & 0x20 ) { Vi += Vbp; o ++; }
+  if ( mix & 0x40 ) { Vi += Vhp; o ++; }
+
+  const unsigned int offsets[] = { 0, 1, 65537, 196609, 393217, 655361, 983041, 1376257 };
+  offset = offsets[ o ];*/
 
   switch (mix & 0x7f) {
   case 0x00:
@@ -1473,7 +2092,7 @@ for my $mix (0..2**@i-1) {
   }
 
   // Sum the inputs in the mixer and run the mixer output through the gain.
-  return (short)(f.gain[vol][f.mixer[(offset + Vi)/SUB_SAMPLE_PRE]/SUB_SAMPLE_GAIN] - (1 << 15));
+  mixerInput = (offset + Vi)/SUB_SAMPLE_PRE;
 }
 
 
@@ -1729,32 +2348,32 @@ int Filter::solve_integrate_6581(int dt, int vi, int& vx, int& vc, model_filter_
   unsigned int Vgdt = kVddt - vi;
   unsigned int Vgdt_2 = Vgdt*Vgdt;
 
-  // "Snake" current, scaled by (1/m)*2^13*m*2^16*m*2^16*2^-15 = m*2^30
-  int n_I_snake = n_snake*(int(Vgst*Vgst - Vgdt_2) >> 15);
+  // CD reordering
 
   // VCR gate voltage.       // Scaled by m*2^16
   // Vg = Vddt - sqrt(((Vddt - Vw)^2 + Vgdt^2)/2)
   int idx = ((Vddt_Vw_2 + (Vgdt_2 >> 1)) >> 16)/SUB_SAMPLE_PRE;
-  /*if ( idx < 0 ) idx = 0;
-  if ( idx > 16383 ) idx = 16383;*/
   int kVg = vcr_kVg[idx];
 
   // VCR voltages for EKV model table lookup.
   int Vgs = kVg - vx;
   if (Vgs < 0) Vgs = 0;
+  // VCR current, scaled by m*2^15*2^15 = m*2^30
+  int idx1 = Vgs/SUB_SAMPLE_PRE;
+  __builtin_prefetch( &vcr_n_Ids_term[idx1] );
+
   int Vgd = kVg - vi;
   if (Vgd < 0) Vgd = 0;
 
   // VCR current, scaled by m*2^15*2^15 = m*2^30
-  int idx1 = Vgs/SUB_SAMPLE_PRE;
-  //if ( idx1 < 0 ) idx1 = 0;
-  //if ( idx1 > 16383 ) idx1 = 16383;
   int idx2 = Vgd/SUB_SAMPLE_PRE;
-  //if ( idx2 < 0 ) idx2 = 0;
-  //if ( idx2 > 16383 ) idx2 = 16383;
-  int n_I_vcr = int(unsigned(vcr_n_Ids_term[idx1] - vcr_n_Ids_term[idx2]) << 15);
+  __builtin_prefetch( &vcr_n_Ids_term[idx2] );
+
+  // "Snake" current, scaled by (1/m)*2^13*m*2^16*m*2^16*2^-15 = m*2^30
+  int n_I_snake = n_snake*(int(Vgst*Vgst - Vgdt_2) >> 15);
 
   // Change in capacitor charge.
+  int n_I_vcr = int(unsigned(vcr_n_Ids_term[idx1] - vcr_n_Ids_term[idx2]) << 15);
   vc -= (n_I_snake + n_I_vcr)*dt;
 
 /*
@@ -1769,8 +2388,6 @@ int Filter::solve_integrate_6581(int dt, int vi, int& vx, int& vc, model_filter_
 
   // vx = g(vc)
   idx = ((vc >> 15) + (1 << 15))/SUB_SAMPLE_PRE;
-  //if ( idx < 0 ) idx = 0;
-  //if ( idx > 16383 ) idx = 16383;
   vx = mf.opamp_rev[idx];
 
   // Return vo.

@@ -17,6 +17,8 @@
 //  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 //  ---------------------------------------------------------------------------
 
+// please note: there are some modifications in this file to be used with SIDKick!
+
 #define RESID_FILTER_CC
 
 #ifdef _M_ARM
@@ -30,14 +32,19 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 RESID_NAMESPACE_START
 
 #include  <avr/pgmspace.h>
 #ifdef PRECALC_TABLES
+#ifdef HIGH_PRECISION_TABLES
 #include "resid_precalc_4_4.h"
+#else
+//#include "resid_precalc_4_4_16.h"
 //#include "resid_precalc_64_64.h"
-//#include "resid_precalc_128_64.h"
+#include "resid_precalc_128_64.h"
+#endif
 #endif
 
 // This is the SID 6581 op-amp voltage transfer function, measured on
@@ -263,15 +270,64 @@ Filter::~Filter()
 {
 }
 
+#if SUB_SAMPLE_PRE == 4
+unsigned short *opamp_rev0;
+unsigned short *opamp_rev1;
+unsigned short *vcr_kVg_precalc;
+unsigned short *vcr_n_Ids_term_precalc;
+//unsigned short *summer0;
+//unsigned short *summer1;
+#endif
+
 // ----------------------------------------------------------------------------
 // Constructor.
 // ----------------------------------------------------------------------------
 Filter::Filter()
 {
   //static bool class_init = 0;
+  mixerInput = gainInput = 0;
 
   //if (!class_init) 
   {
+
+    #if SUB_SAMPLE_PRE == 4
+    opamp_rev0 = new unsigned short[ 16384 ];
+    memcpy( opamp_rev0, opamp_rev0_slow, sizeof( unsigned short ) * 16384 );
+    opamp_rev1 = new unsigned short[ 16384 ];
+    memcpy( opamp_rev1, opamp_rev1_slow, sizeof( unsigned short ) * 16384 );
+    vcr_kVg_precalc = new unsigned short[ 16384 ];
+    memcpy( vcr_kVg_precalc, vcr_kVg_precalc_slow, sizeof( unsigned short ) * 16384 );
+    vcr_n_Ids_term_precalc = new unsigned short[ 16384 ];
+    memcpy( vcr_n_Ids_term_precalc, vcr_n_Ids_term_precalc_slow, sizeof( unsigned short ) * 16384 );
+
+/*    gain0 = new unsigned short[ ( 16 * 16384 ) / 4 ];
+    gain1 = new unsigned short[ ( 16 * 16384 ) / 4 ];
+
+    for ( int v = 0; v < 16; v++ )
+    {
+      for ( int i = 0; i < 16384 / 4; i++ )
+      {
+        gain0[ v * (16384 / 4) + i ] = gain0_slow[ v ][ i * 4 ];
+        gain1[ v * (16384 / 4) + i ] = gain1_slow[ v ][ i * 4 ];
+      }
+    }*/
+
+    /*summer0 = new unsigned short[ 327680 / 4 ];
+    summer1 = new unsigned short[ 327680 / 4 ];
+    if ( summer0 != NULL && summer1 != NULL )
+    {
+      for ( int i = 0; i < 327680 / 4; i++ )
+      {
+        summer0[ i ] = ( (int)summer0_slow[ i * 4 ] + (int)summer0_slow[ i * 4 + 1 ] + (int)summer0_slow[ i * 4 + 2 ] + (int)summer0_slow[ i * 4 + 3 ] ) / 4;
+        summer1[ i ] = ( (int)summer1_slow[ i * 4 ] + (int)summer1_slow[ i * 4 + 1 ] + (int)summer1_slow[ i * 4 + 2 ] + (int)summer1_slow[ i * 4 + 3 ] ) / 4;
+      }
+    } else
+    {
+      summer0 = summer0_slow;
+      summer1 = summer1_slow;
+    }*/
+    #endif
+
     FLOAT tmp_n_param[2];
 
     // Temporary tables for op-amp transfer function.
@@ -293,7 +349,7 @@ Filter::Filter()
       FLOAT kVddt = fi.k*(fi.Vdd - fi.Vth);
       FLOAT vmax = kVddt < opamp_max ? opamp_max : kVddt;
       FLOAT denorm = vmax - vmin;
-      FLOAT norm = 1.0/denorm;
+      FLOAT norm = 1.0f/denorm;
 
       // Scaling and translation constants.
       FLOAT N16 = norm*((1u << 16) - 1);
@@ -312,7 +368,7 @@ Filter::Filter()
       // k*Vddt - x = (k*Vddt - t) - (x - t)
       mf.kVddt = (int)(N16*(kVddt - vmin) + 0.5);
 
-      tmp_n_param[m] = denorm*(1 << 13)*(fi.uCox/(2*fi.k)*1.0e-6/fi.C);
+      tmp_n_param[m] = denorm*(1 << 13)*(fi.uCox/(2.0f*fi.k)*1.0e-6f/fi.C);
 
 #ifndef PRECALC_TABLES
 
@@ -414,6 +470,9 @@ Filter::Filter()
         if ( m == 0 )
           mf.gain[n8] = &gain0[n8][0]; else
           mf.gain[n8] = &gain1[n8][0];
+        /*if ( m == 0 )
+          mf.gain[n8] = &gain0[n8*(16384/4)]; else
+          mf.gain[n8] = &gain1[n8*(16384/4)];*/
 #endif
       }
 

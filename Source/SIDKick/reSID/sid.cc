@@ -17,6 +17,8 @@
 //  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 //  ---------------------------------------------------------------------------
 
+// please note: there are some modifications in this file to be used with SIDKick!
+
 #define RESID_SID_CC
 
 #ifdef _M_ARM
@@ -755,8 +757,25 @@ void SID::clock(cycle_count delta_t)
   // Clock filter.
   filter->clock(delta_t, voice[0].output(), voice[1].output(), voice[2].output());
 
+#if 0
+  filter->prepare_output();
+  filter->process_output_step1();
+  //filter->process_output_step2();
+
+  //extfilt.clock(delta_t, filter->get_output());
+#endif
   // Clock external filter.
   extfilt.clock(delta_t, filter->output());
+}
+
+void SID::clock_pp1()
+{
+  filter->process_output_step2();
+}
+
+void SID::clock_pp2(cycle_count delta_t)
+{
+  extfilt.clock(delta_t, filter->get_output());
 }
 
 
