@@ -72,6 +72,9 @@ Revision History:
         verify volume of the FM part on the Y8950
 */
 
+// note: this version has some minor changes for use with SIDKick!
+
+
 //#include "vice.h"
 
 #include <math.h>
@@ -82,7 +85,7 @@ Revision History:
 #include "fmopl.h"
 
 #ifndef M_PI
-#define M_PI 3.14159265358979323846
+#define M_PI 3.14159265358979323846f
 #endif
 
 #define FINAL_SH (0)
@@ -99,7 +102,7 @@ Revision History:
 /* envelope output entries */
 #define ENV_BITS 10
 #define ENV_LEN  (1 << ENV_BITS)
-#define ENV_STEP (128.0 / ENV_LEN)
+#define ENV_STEP (128.0f / ENV_LEN)
 
 #define MAX_ATT_INDEX ((1 << (ENV_BITS - 1)) - 1) /*511*/
 #define MIN_ATT_INDEX (0)
@@ -143,62 +146,62 @@ static const int slot_array[32] = {
 /* key scale level */
 /* table is 3dB/octave , DV converts this into 6dB/octave */
 /* 0.1875 is bit 0 weight of the envelope counter (volume) expressed in the 'decibel' scale */
-#define DV (0.1875 / 2.0)
+#define DV (0.1875f / 2.0f)
 
-static const double ksl_tab[8 * 16] = {
+static const float ksl_tab[8 * 16] = {
     /* OCT 0 */
-    0.000 / DV, 0.000 / DV, 0.000 / DV, 0.000 / DV,
-    0.000 / DV, 0.000 / DV, 0.000 / DV, 0.000 / DV,
-    0.000 / DV, 0.000 / DV, 0.000 / DV, 0.000 / DV,
-    0.000 / DV, 0.000 / DV, 0.000 / DV, 0.000 / DV,
+    0.000f / DV, 0.000f / DV, 0.000f / DV, 0.000f / DV,
+    0.000f / DV, 0.000f / DV, 0.000f / DV, 0.000f / DV,
+    0.000f / DV, 0.000f / DV, 0.000f / DV, 0.000f / DV,
+    0.000f / DV, 0.000f / DV, 0.000f / DV, 0.000f / DV,
 
     /* OCT 1 */
-    0.000 / DV, 0.000 / DV, 0.000 / DV, 0.000 / DV,
-    0.000 / DV, 0.000 / DV, 0.000 / DV, 0.000 / DV,
-    0.000 / DV, 0.750 / DV, 1.125 / DV, 1.500 / DV,
-    1.875 / DV, 2.250 / DV, 2.625 / DV, 3.000 / DV,
+    0.000f / DV, 0.000f / DV, 0.000f / DV, 0.000f / DV,
+    0.000f / DV, 0.000f / DV, 0.000f / DV, 0.000f / DV,
+    0.000f / DV, 0.750f / DV, 1.125f / DV, 1.500f / DV,
+    1.875f / DV, 2.250f / DV, 2.625f / DV, 3.000f / DV,
 
     /* OCT 2 */
-    0.000 / DV, 0.000 / DV, 0.000 / DV, 0.000 / DV,
-    0.000 / DV, 1.125 / DV, 1.875 / DV, 2.625 / DV,
-    3.000 / DV, 3.750 / DV, 4.125 / DV, 4.500 / DV,
-    4.875 / DV, 5.250 / DV, 5.625 / DV, 6.000 / DV,
+    0.000f / DV, 0.000f / DV, 0.000f / DV, 0.000f / DV,
+    0.000f / DV, 1.125f / DV, 1.875f / DV, 2.625f / DV,
+    3.000f / DV, 3.750f / DV, 4.125f / DV, 4.500f / DV,
+    4.875f / DV, 5.250f / DV, 5.625f / DV, 6.000f / DV,
 
     /* OCT 3 */
-    0.000 / DV, 0.000 / DV, 0.000 / DV, 1.875 / DV,
-    3.000 / DV, 4.125 / DV, 4.875 / DV, 5.625 / DV,
-    6.000 / DV, 6.750 / DV, 7.125 / DV, 7.500 / DV,
-    7.875 / DV, 8.250 / DV, 8.625 / DV, 9.000 / DV,
+    0.000f / DV, 0.000f / DV, 0.000f / DV, 1.875f / DV,
+    3.000f / DV, 4.125f / DV, 4.875f / DV, 5.625f / DV,
+    6.000f / DV, 6.750f / DV, 7.125f / DV, 7.500f / DV,
+    7.875f / DV, 8.250f / DV, 8.625f / DV, 9.000f / DV,
 
     /* OCT 4 */
-     0.000 / DV,  0.000 / DV,  3.000 / DV,  4.875 / DV,
-     6.000 / DV,  7.125 / DV,  7.875 / DV,  8.625 / DV,
-     9.000 / DV,  9.750 / DV, 10.125 / DV, 10.500 / DV,
-    10.875 / DV, 11.250 / DV, 11.625 / DV, 12.000 / DV,
+     0.000f / DV,  0.000f / DV,  3.000f / DV,  4.875f / DV,
+     6.000f / DV,  7.125f / DV,  7.875f / DV,  8.625f / DV,
+     9.000f / DV,  9.750f / DV, 10.125f / DV, 10.500f / DV,
+    10.875f / DV, 11.250f / DV, 11.625f / DV, 12.000f / DV,
 
     /* OCT 5 */
-     0.000 / DV,  3.000 / DV,  6.000 / DV,  7.875 / DV,
-     9.000 / DV, 10.125 / DV, 10.875 / DV, 11.625 / DV,
-    12.000 / DV, 12.750 / DV, 13.125 / DV, 13.500 / DV,
-    13.875 / DV, 14.250 / DV, 14.625 / DV, 15.000 / DV,
+     0.000f / DV,  3.000f / DV,  6.000f / DV,  7.875f / DV,
+     9.000f / DV, 10.125f / DV, 10.875f / DV, 11.625f / DV,
+    12.000f / DV, 12.750f / DV, 13.125f / DV, 13.500f / DV,
+    13.875f / DV, 14.250f / DV, 14.625f / DV, 15.000f / DV,
 
     /* OCT 6 */
-     0.000 / DV,  6.000 / DV,  9.000 / DV, 10.875 / DV,
-    12.000 / DV, 13.125 / DV, 13.875 / DV, 14.625 / DV,
-    15.000 / DV, 15.750 / DV, 16.125 / DV, 16.500 / DV,
-    16.875 / DV, 17.250 / DV, 17.625 / DV, 18.000 / DV,
+     0.000f / DV,  6.000f / DV,  9.000f / DV, 10.875f / DV,
+    12.000f / DV, 13.125f / DV, 13.875f / DV, 14.625f / DV,
+    15.000f / DV, 15.750f / DV, 16.125f / DV, 16.500f / DV,
+    16.875f / DV, 17.250f / DV, 17.625f / DV, 18.000f / DV,
 
     /* OCT 7 */
-     0.000 / DV,  9.000 / DV, 12.000 / DV, 13.875 / DV,
-    15.000 / DV, 16.125 / DV, 16.875 / DV, 17.625 / DV,
-    18.000 / DV, 18.750 / DV, 19.125 / DV, 19.500 / DV,
-    19.875 / DV, 20.250 / DV, 20.625 / DV, 21.000 / DV
+     0.000f / DV,  9.000f / DV, 12.000f / DV, 13.875f / DV,
+    15.000f / DV, 16.125f / DV, 16.875f / DV, 17.625f / DV,
+    18.000f / DV, 18.750f / DV, 19.125f / DV, 19.500f / DV,
+    19.875f / DV, 20.250f / DV, 20.625f / DV, 21.000f / DV
 };
 #undef DV
 
 /* sustain level table (3dB per step) */
 /* 0 - 15: 0, 3, 6, 9,12,15,18,21,24,27,30,33,36,39,42,93 (dB)*/
-#define SC(db) (UINT32)(db * (2.0 / ENV_STEP))
+#define SC(db) (UINT32)(db * (2.0f / ENV_STEP))
 
 static const UINT32 sl_tab[16] = {
     SC(0), SC(1), SC(2), SC(3), SC(4), SC(5), SC(6), SC(7),
@@ -311,12 +314,12 @@ static const unsigned char eg_rate_shift[16 + 64 + 16] = {      /* Envelope Gene
 #undef O
 
 /* multiple table */
-#define ML 2
+#define ML 2.0f
 
-static const double mul_tab[16] = {
+static const float mul_tab[16] = {
 /* 1/2, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,10,12,12,15,15 */
-    0.50 * ML, 1.00 * ML, 2.00 * ML, 3.00 * ML, 4.00 * ML, 5.00 * ML, 6.00 * ML, 7.00 * ML,
-    8.00 * ML, 9.00 * ML, 10.00 * ML, 10.00 * ML, 12.00 * ML, 12.00 * ML, 15.00 * ML, 15.00 * ML
+    0.50f * ML, 1.00f * ML, 2.00f * ML, 3.00f * ML, 4.00f * ML, 5.00f * ML, 6.00f * ML, 7.00f * ML,
+    8.00f * ML, 9.00f * ML, 10.00f * ML, 10.00f * ML, 12.00f * ML, 12.00f * ML, 15.00f * ML, 15.00f * ML
 };
 #undef ML
 
@@ -489,7 +492,7 @@ static void fmopl_alarm_B(CLOCK offset, void *data)
 
 /* ---------------------------------------------------------------------*/
 
-inline static int limit(int val, int max, int min)
+__attribute__( ( always_inline ) ) inline static int limit(int val, int max, int min)
 {
     if (val > max) {
         val = max;
@@ -501,7 +504,7 @@ inline static int limit(int val, int max, int min)
 }
 
 /* status set and IRQ handling */
-inline static void OPL_STATUS_SET(FM_OPL *OPL, int flag)
+__attribute__( ( always_inline ) ) inline static void OPL_STATUS_SET(FM_OPL *OPL, int flag)
 {
     /* set status flag */
     OPL->status |= flag;
@@ -513,7 +516,7 @@ inline static void OPL_STATUS_SET(FM_OPL *OPL, int flag)
 }
 
 /* status reset and IRQ handling */
-inline static void OPL_STATUS_RESET(FM_OPL *OPL, int flag)
+__attribute__( ( always_inline ) ) inline static void OPL_STATUS_RESET(FM_OPL *OPL, int flag)
 {
     /* reset status flag */
     OPL->status &= ~flag;
@@ -525,7 +528,7 @@ inline static void OPL_STATUS_RESET(FM_OPL *OPL, int flag)
 }
 
 /* IRQ mask set */
-inline static void OPL_STATUSMASK_SET(FM_OPL *OPL, int flag)
+__attribute__( ( always_inline ) ) inline static void OPL_STATUSMASK_SET(FM_OPL *OPL, int flag)
 {
     OPL->statusmask = flag;
 
@@ -535,7 +538,7 @@ inline static void OPL_STATUSMASK_SET(FM_OPL *OPL, int flag)
 }
 
 /* advance LFO to next sample */
-inline static void advance_lfo(FM_OPL *OPL)
+__attribute__( ( always_inline ) ) inline static void advance_lfo(FM_OPL *OPL)
 {
     UINT8 tmp;
 
@@ -558,7 +561,7 @@ inline static void advance_lfo(FM_OPL *OPL)
 }
 
 /* advance to next sample */
-inline static void advance(FM_OPL *OPL)
+__attribute__( ( always_inline ) ) inline static void advance(FM_OPL *OPL)
 {
     OPL_CH *CH;
     OPL_SLOT *op;
@@ -687,7 +690,7 @@ inline static void advance(FM_OPL *OPL)
     }
 }
 
-inline static signed int op_calc(UINT32 phase, unsigned int env, signed int pm, unsigned int wave_tab)
+__attribute__( ( always_inline ) ) inline static signed int op_calc(UINT32 phase, unsigned int env, signed int pm, unsigned int wave_tab)
 {
     UINT32 p;
 
@@ -699,7 +702,7 @@ inline static signed int op_calc(UINT32 phase, unsigned int env, signed int pm, 
     return tl_tab[p];
 }
 
-inline static signed int op_calc1(UINT32 phase, unsigned int env, signed int pm, unsigned int wave_tab)
+__attribute__( ( always_inline ) ) inline static signed int op_calc1(UINT32 phase, unsigned int env, signed int pm, unsigned int wave_tab)
 {
     UINT32 p;
 
@@ -714,7 +717,7 @@ inline static signed int op_calc1(UINT32 phase, unsigned int env, signed int pm,
 #define volume_calc(OP) ((OP)->TLL + ((UINT32)(OP)->volume) + (LFO_AM & (OP)->AMmask))
 
 /* calculate output */
-inline static void OPL_CALC_CH(OPL_CH *CH)
+__attribute__( ( always_inline ) ) inline static void OPL_CALC_CH(OPL_CH *CH)
 {
     OPL_SLOT *SLOT;
     unsigned int env;
@@ -781,7 +784,7 @@ number   number    BLK/FNUM2 FNUM    Drum  Hat   Drum  Tom  Cymbal
 
 /* calculate rhythm */
 
-inline static void OPL_CALC_RH(OPL_CH *CH, unsigned int noise)
+__attribute__( ( always_inline ) ) inline static void OPL_CALC_RH(OPL_CH *CH, unsigned int noise)
 {
     OPL_SLOT *SLOT;
     signed int out;
@@ -951,11 +954,11 @@ static int init_tables(void)
 {
     signed int i, x;
     signed int n;
-    double o, m;
+    float o, m;
 
     for (x = 0; x < TL_RES_LEN; x++) {
-        m = (1 << 16) / pow(2, (x + 1) * (ENV_STEP / 4.0) / 8.0);
-        m = floor(m);
+        m = (1 << 16) / powf(2.0f, (x + 1) * (ENV_STEP / 4.0f) / 8.0f);
+        m = floorf(m);
 
         /* we never reach (1<<16) here due to the (x+1) */
         /* result fits within 16 bits at maximum */
@@ -980,25 +983,25 @@ static int init_tables(void)
 
     for (i = 0; i < SIN_LEN; i++) {
         /* non-standard sinus */
-        m = sin(((i * 2) + 1) * M_PI / SIN_LEN ); /* checked against the real chip */
+        m = sinf(((i * 2) + 1) * M_PI / SIN_LEN ); /* checked against the real chip */
 
         /* we never reach zero here due to ((i * 2) + 1) */
 
-        if (m > 0.0) {
-            o = 8 * log(1.0 / m) / log(2.0);    /* convert to 'decibels' */
+        if (m > 0.0f) {
+            o = 8.0f * logf(1.0f / m) / logf(2.0f);    /* convert to 'decibels' */
         } else {
-            o = 8 * log(-1.0 / m) / log(2.0);   /* convert to 'decibels' */
+            o = 8.0f * logf(-1.0f / m) / logf(2.0f);   /* convert to 'decibels' */
         }
 
         o = o / (ENV_STEP / 4);
 
-        n = (int)(2.0 * o);
+        n = (int)(2.0f * o);
         if (n & 1) {                                            /* round to nearest */
             n = (n >> 1) + 1;
         } else {
             n = n >> 1;
         }
-        sin_tab[i] = n * 2 + (m >= 0.0 ? 0 : 1);
+        sin_tab[i] = n * 2 + (m >= 0.0f ? 0 : 1);
     }
 
     for (i = 0; i < SIN_LEN; i++) {
@@ -1036,34 +1039,59 @@ static void OPLCloseTable( void )
 {
 }
 
-static void OPL_initalize(FM_OPL *OPL)
+void OPL_initalize(FM_OPL *OPL)
 {
     int i;
 
     /* frequency base */
-    OPL->freqbase = (OPL->rate) ? ((double)OPL->clock / 72.0) / OPL->rate : 0;
+    OPL->freqbase = (OPL->rate) ? ((float)OPL->clock / 72.0f) / OPL->rate : 0;
 
     /* make fnumber -> increment counter table */
     for (i = 0; i < 1024; i++) {
         /* opn phase increment counter = 20bit */
-        OPL->fn_tab[i] = (UINT32)((double)i * 64 * OPL->freqbase * (1 << (FREQ_SH - 10))); /* -10 because chip works with 10.10 fixed point, while we use 16.16 */
+        OPL->fn_tab1[i] = (UINT32)((float)i * 64 * OPL->freqbase * (1 << (FREQ_SH - 10))); /* -10 because chip works with 10.10 fixed point, while we use 16.16 */
     }
+    for (i = 0; i < 1024; i++) {
+        /* opn phase increment counter = 20bit */
+        OPL->fn_tab2[i] = (UINT32)((float)i * 64 * 2 * OPL->freqbase * (1 << (FREQ_SH - 10))); /* -10 because chip works with 10.10 fixed point, while we use 16.16 */
+    }
+
+    OPL->fn_tab = &OPL->fn_tab1[0];
 
     /* Amplitude modulation: 27 output levels (triangle waveform); 1 level takes one of: 192, 256 or 448 samples */
     /* One entry from LFO_AM_TABLE lasts for 64 samples */
-    OPL->lfo_am_inc = (UINT32)((1.0 / 64.0) * (1 << LFO_SH) * OPL->freqbase);
+    OPL->lfo_am_inc = (UINT32)((1.0f / 64.0f) * (1 << LFO_SH) * OPL->freqbase);
 
     /* Vibrato: 8 output levels (triangle waveform); 1 level takes 1024 samples */
-    OPL->lfo_pm_inc = (UINT32)((1.0 / 1024.0) * (1 << LFO_SH) * OPL->freqbase);
+    OPL->lfo_pm_inc = (UINT32)((1.0f / 1024.0f) * (1 << LFO_SH) * OPL->freqbase);
 
     /* Noise generator: a step takes 1 sample */
-    OPL->noise_f = (UINT32)((1.0 / 1.0) * (1 << FREQ_SH) * OPL->freqbase);
+    OPL->noise_f = (UINT32)((1.0f / 1.0f) * (1 << FREQ_SH) * OPL->freqbase);
 
     OPL->eg_timer_add = (UINT32)((1 << EG_SH) * OPL->freqbase);
     OPL->eg_timer_overflow = (1) * (1 << EG_SH);
 }
 
-inline static void FM_KEYON(OPL_SLOT *SLOT, UINT32 key_set)
+void OPL_initalize_without_table(FM_OPL *OPL)
+{
+    /* frequency base */
+    OPL->freqbase = (OPL->rate) ? ((float)OPL->clock / 72.0f) / OPL->rate : 0;
+
+    /* Amplitude modulation: 27 output levels (triangle waveform); 1 level takes one of: 192, 256 or 448 samples */
+    /* One entry from LFO_AM_TABLE lasts for 64 samples */
+    OPL->lfo_am_inc = (UINT32)((1.0f / 64.0f) * (1 << LFO_SH) * OPL->freqbase);
+
+    /* Vibrato: 8 output levels (triangle waveform); 1 level takes 1024 samples */
+    OPL->lfo_pm_inc = (UINT32)((1.0f / 1024.0f) * (1 << LFO_SH) * OPL->freqbase);
+
+    /* Noise generator: a step takes 1 sample */
+    OPL->noise_f = (UINT32)((1.0f / 1.0f) * (1 << FREQ_SH) * OPL->freqbase);
+
+    OPL->eg_timer_add = (UINT32)((1 << EG_SH) * OPL->freqbase);
+    OPL->eg_timer_overflow = (1) * (1 << EG_SH);
+}
+
+__attribute__( ( always_inline ) ) inline static void FM_KEYON(OPL_SLOT *SLOT, UINT32 key_set)
 {
     if (!SLOT->key) {
         /* restart Phase Generator */
@@ -1075,7 +1103,7 @@ inline static void FM_KEYON(OPL_SLOT *SLOT, UINT32 key_set)
     SLOT->key |= key_set;
 }
 
-inline static void FM_KEYOFF(OPL_SLOT *SLOT, UINT32 key_clr)
+__attribute__( ( always_inline ) ) inline static void FM_KEYOFF(OPL_SLOT *SLOT, UINT32 key_clr)
 {
     if (SLOT->key) {
         SLOT->key &= key_clr;
@@ -1090,7 +1118,7 @@ inline static void FM_KEYOFF(OPL_SLOT *SLOT, UINT32 key_clr)
 }
 
 /* update phase increment counter of operator (also update the EG rates if necessary) */
-inline static void CALC_FCSLOT(OPL_CH *CH, OPL_SLOT *SLOT)
+__attribute__( ( always_inline ) ) inline static void CALC_FCSLOT(OPL_CH *CH, OPL_SLOT *SLOT)
 {
     int ksr;
 
@@ -1117,7 +1145,7 @@ inline static void CALC_FCSLOT(OPL_CH *CH, OPL_SLOT *SLOT)
 }
 
 /* set multi,am,vib,EG-TYP,KSR,mul */
-inline static void set_mul(FM_OPL *OPL, int slot, int v)
+__attribute__( ( always_inline ) ) inline static void set_mul(FM_OPL *OPL, int slot, int v)
 {
     OPL_CH *CH = &OPL->P_CH[slot / 2];
     OPL_SLOT *SLOT = &CH->SLOT[slot & 1];
@@ -1131,7 +1159,7 @@ inline static void set_mul(FM_OPL *OPL, int slot, int v)
 }
 
 /* set ksl & tl */
-inline static void set_ksl_tl(FM_OPL *OPL, int slot, int v)
+__attribute__( ( always_inline ) ) inline static void set_ksl_tl(FM_OPL *OPL, int slot, int v)
 {
     OPL_CH *CH = &OPL->P_CH[slot / 2];
     OPL_SLOT *SLOT = &CH->SLOT[slot & 1];
@@ -1144,7 +1172,7 @@ inline static void set_ksl_tl(FM_OPL *OPL, int slot, int v)
 }
 
 /* set attack rate & decay rate  */
-inline static void set_ar_dr(FM_OPL *OPL, int slot, int v)
+__attribute__( ( always_inline ) ) inline static void set_ar_dr(FM_OPL *OPL, int slot, int v)
 {
     OPL_CH *CH = &OPL->P_CH[slot / 2];
     OPL_SLOT *SLOT = &CH->SLOT[slot & 1];
@@ -1165,7 +1193,7 @@ inline static void set_ar_dr(FM_OPL *OPL, int slot, int v)
 }
 
 /* set sustain level & release rate */
-inline static void set_sl_rr(FM_OPL *OPL, int slot, int v)
+__attribute__( ( always_inline ) ) inline static void set_sl_rr(FM_OPL *OPL, int slot, int v)
 {
     OPL_CH *CH = &OPL->P_CH[slot / 2];
     OPL_SLOT *SLOT = &CH->SLOT[slot & 1];
@@ -1605,7 +1633,7 @@ static unsigned char OPLRead(FM_OPL *OPL, int a)
 }
 
 /* CSM Key Controll */
-inline static void CSMKeyControll(OPL_CH *CH)
+__attribute__( ( always_inline ) ) inline static void CSMKeyControll(OPL_CH *CH)
 {
     FM_KEYON(&CH->SLOT[SLOT1], 4);
     FM_KEYON(&CH->SLOT[SLOT2], 4);
@@ -1745,7 +1773,7 @@ void ym3812_update_one(FM_OPL *chip, OPLSAMPLE *buffer, int length)
         lt >>= FINAL_SH;
 
         /* limit check */
-        lt = limit(lt, MAXOUT, MINOUT);
+        //lt = limit(lt, MAXOUT, MINOUT);
 
         /* store to sound buffer */
         buf[i] = lt;

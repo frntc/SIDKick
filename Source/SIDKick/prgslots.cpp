@@ -8,7 +8,7 @@
         
  prgslots.cpp
 
- SIDKick - SID-replacement with SID and Sound Expander Emulation based on Teensy 4.1
+ SIDKick - SID-replacement with SID, Sound Expander and MIDI Emulation based on Teensy 4.1
            (using reSID by Dag Lem and FMOPL by Jarek Burczynski, Tatsuyuki Satoh, Marco van den Heuvel, and Acho A. Tang)
  Copyright (c) 2019-2021 Carsten Dachsbacher <frenetic@dachsbacher.de>
 
@@ -29,7 +29,9 @@
 */
 #include <avr/pgmspace.h>
 
-unsigned char prgDirectory[ 36 * 24 + 1 ] = 
+unsigned char prgDirectory[ 36 * 24 + 1 ];
+
+unsigned char prgDirectory_Flash[ 36 * 24 + 1 ] PROGMEM = 
 { 
   // 18 byte name (string null-terminated), 4 byte ofs, 2 byte length
   'E', 'M', 'P', 'T', 'Y', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

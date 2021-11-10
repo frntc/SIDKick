@@ -75,7 +75,9 @@ typedef struct fm_opl_f {
 
     UINT8 rhythm;                               /* Rhythm mode                  */
 
-    UINT32 fn_tab[1024];                /* fnumber->increment counter   */
+    UINT32 fn_tab1[1024];                /* fnumber->increment counter   */
+    UINT32 fn_tab2[1024];                /* fnumber->increment counter   */
+    UINT32 *fn_tab;                /* fnumber->increment counter   */
 
     /* LFO */
     UINT8 lfo_am_depth;
@@ -104,7 +106,7 @@ typedef struct fm_opl_f {
 
     UINT32 clock;                                       /* master clock  (Hz)           */
     UINT32 rate;                                        /* sampling rate (Hz)           */
-    double freqbase;                            /* frequency base               */
+    float freqbase;                            /* frequency base               */
 } FM_OPL;
 
 /*

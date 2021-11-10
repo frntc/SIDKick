@@ -6,7 +6,7 @@
  /_______  /|___/_______  /____|__ \__|\___  >__|_ \ 
          \/             \/        \/       \/     \/ 
         
- SIDKick - SID-replacement with SID and Sound Expander Emulation based on Teensy 4.1
+ SIDKick - SID-replacement with SID, Sound Expander and MIDI Emulation based on Teensy 4.1
  Copyright (c) 2019-2021 Carsten Dachsbacher <frenetic@dachsbacher.de>
 
  Logo created with http://patorjk.com/software/taag/
