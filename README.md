@@ -35,6 +35,8 @@ Currently its features include:
  
 </p>
 
+**Videos** by emulaThor showcasing the **LED-stripe** support can be found [here](https://www.youtube.com/playlist?list=PLFBAnRI8OY7avO3m9wFhcAdgXgk4aZE_6).
+
 <br />
   
 
