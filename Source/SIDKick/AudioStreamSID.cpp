@@ -709,15 +709,26 @@ FASTRUN void AudioStreamSID::update()
     //    samplesElapsed = ( ( unsigned long long )nCyclesEmulated * ( unsigned long long )AUDIO_SAMPLE_RATE_EXACT ) / ( unsigned long long )CLOCKFREQ;
 
     extern uint8_t outRegisters[ 32 ];
+    extern uint8_t outRegisters_2[ 32 ];
     if ( useSID16 )
     {
       outRegisters[ 0x1b ] = sid16_1->read( 0x1b );
       outRegisters[ 0x1c ] = sid16_1->read( 0x1c );
+      if ( activeSID2 )
+      {
+        outRegisters_2[ 0x1b ] = sid16_2->read( 0x1b );
+        outRegisters_2[ 0x1c ] = sid16_2->read( 0x1c );
+      }
     } else
     {
       #ifndef NO_RESID10
       outRegisters[ 0x1b ] = sid_1->read( 0x1b );
       outRegisters[ 0x1c ] = sid_1->read( 0x1c );
+      if ( activeSID2 )
+      {
+        outRegisters_2[ 0x1b ] = sid_2->read( 0x1b );
+        outRegisters_2[ 0x1c ] = sid_2->read( 0x1c );
+      }
       #endif
     }
 
