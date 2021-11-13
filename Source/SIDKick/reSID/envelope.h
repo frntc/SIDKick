@@ -234,6 +234,10 @@ void EnvelopeGenerator::clock(cycle_count delta_t)
   }
 
   while (delta_t) {
+    // SIDKICK: this env3=... was missing, as a consequence reading 0x1c does not return (correct) values when emulating several cycles at once
+    // The ENV3 value is sampled at the first phase of the clock
+    env3 = envelope_counter;
+
     if (delta_t < rate_step) {
       // likely (~65%)
       rate_counter += delta_t;
