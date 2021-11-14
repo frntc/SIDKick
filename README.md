@@ -1,7 +1,7 @@
 
 <p align="center" font-size: 30px;>
   <img src="Images/SIDKick_logo.png" height="120"> <br>
-  <b> .- the first complete SID-drop-in-replacement that you can build yourself -. </b><br><br>
+  <b> .- the first complete SID replacement that you can build yourself -. </b><br><br>
 </p>
 
 SIDKick is a drop-in replacement for the SID sound chips used in C64s and C128s based on a Teensy 4.1. 
