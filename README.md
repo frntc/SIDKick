@@ -118,7 +118,7 @@ The built-in configuration tool displays which cables have been (properly) insta
 ### Audio Output
 <img align="right" width="160" height="160" src="https://raw.githubusercontent.com/frntc/SIDKick/master/Images/SIDKick_ortho.jpg">
 
-You need to choose how to output the sound. You can either use the solder jumper (labelled "MQS DAC" and connect the left-center or center-right to route *mono-audio* through the mainboard. The better option is to take the *stereo output* from the pins labelled R GND L (for DAC) or MQS L/R and GNG (for MQS). Note that you need to choose the corresponding firmware version which outputs sound to either MQS or DAC.
+You need to choose how to output the sound. You can either use the solder jumper (labelled "MQS DAC" and connect the left-center or center-right to route *mono-audio* through the mainboard. The better option is to take the *stereo output* from the pins labelled R GND L (for DAC) or MQS L/R and GND (for MQS). Note that you need to choose the corresponding firmware version which outputs sound to either MQS or DAC.
 
 ### Powering the SIDKick
 In principle you can power the Teensy from USB, but the USB-connection is only needed and recommended for development. SIDKick can be powered from the main board by either closing the solder-jumper or the pin-jumper (close to Teensy pin 1) on the bottom side of the PCB.
