@@ -1,16 +1,15 @@
-
+  
 <p align="center" font-size: 30px;>
   <img src="Images/SIDKick_logo.png" height="120"> <br>
-  <b> .- the first complete SID replacement that you can build yourself -. </b><br><br>
+  <b> .- the first complete SID replacement plus FM and MIDI device that you can build yourself -. </b><br><br>
 </p>
 
-SIDKick is a drop-in replacement for the SID sound chips used in C64s and C128s based on a Teensy 4.1. 
-It is able to emulate two SIDs (6581 and/or 8580), a Sound Expander (offering Yamaha OPL-based FM sound), and a MIDI interface at the same time. It makes no compromises with regard to quality: the emulation is based on reSID and fmOPL. It also comes with a few extras.
+SIDKick is a versatile sound device for C64s and C128s: it serves as a drop-in replacement for the SID 6581/8580 sound chips, and at the same time provides Sound Expander-emulation (Yamaha OPL-based FM sound), a MIDI interface and can control LED stripes. It is based on a Teensy 4.1 and makes no compromises with regard to quality: the emulation is based on reSID and fmOPL. It also comes with a few extras.
 
 Currently its features include:
 -	dual 6581 and/or 8580 emulation based on reSID 0.16 or reSID 1.0 (configurable)
 -	2nd-SID address at $d400, $d420, $d500, $d420 + $d500 simultaneously, $de00, $df00
--	Sound Expander/FM emulation based on fmOPL (at $df00)
+-	Sound Expander/FM emulation based on fmOPL (at $df00), support for OPL sample playing technique
 -	paddle/mouse support
 -	built-in configuration menu (launch with "SYS 54301" or "SYS 54333", also from C128-mode)
 -	built-in PRG launcher (via menu)
@@ -20,7 +19,7 @@ Currently its features include:
 -	sound output via Teensy MQS (PWM) or high-quality using a PT8211/TM8211-DAC, filters, and an operational amplifier
 -	output available at connectors (stereo) or routed through the mainboard (mono)
 
-[^1]: available with firmware version 0.2.
+[^1]: available with firmware version 0.2+.
 
 
 <p align="center" font-size: 30px;>
