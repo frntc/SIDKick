@@ -10,7 +10,7 @@
 
  SIDKick - SID-replacement with SID, Sound Expander and MIDI Emulation based on Teensy 4.1
            (using reSID by Dag Lem and FMOPL by Jarek Burczynski, Tatsuyuki Satoh, Marco van den Heuvel, and Acho A. Tang)
- Copyright (c) 2019-2021 Carsten Dachsbacher <frenetic@dachsbacher.de>
+ Copyright (c) 2019-2022 Carsten Dachsbacher <frenetic@dachsbacher.de>
 
  Logo created with http://patorjk.com/software/taag/
  
@@ -74,6 +74,8 @@ private:
   #ifdef EMULATE_OPL2
   FM_OPL *pOPL;
   uint32_t fmOutRegister, fmFakeOutput;
+  uint8_t hack_OPL_Sample_Value;
+  uint8_t hack_OPL_Sample_Enabled;
   #endif
 
 public:

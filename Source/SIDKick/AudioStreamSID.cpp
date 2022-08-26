@@ -10,7 +10,7 @@
 
  SIDKick - SID-replacement with SID, Sound Expander and MIDI Emulation based on Teensy 4.1
            (using reSID by Dag Lem and FMOPL by Jarek Burczynski, Tatsuyuki Satoh, Marco van den Heuvel, and Acho A. Tang)
- Copyright (c) 2019-2021 Carsten Dachsbacher <frenetic@dachsbacher.de>
+ Copyright (c) 2019-2022 Carsten Dachsbacher <frenetic@dachsbacher.de>
 
  Logo created with http://patorjk.com/software/taag/
  
@@ -112,6 +112,8 @@ void AudioStreamSID::init()
   pOPL = ym3812_init( 3579545, SAMPLERATE );
   ym3812_reset_chip( pOPL );
   fmFakeOutput = 0;
+  hack_OPL_Sample_Value = 0;
+  hack_OPL_Sample_Enabled = 0;
   #endif
   
   sid16_1->set_chip_model( MOS6581 );
@@ -444,7 +446,7 @@ void AudioStreamSID::continuePlaying()
 extern uint32_t c64CycleCount;
 extern uint32_t nCyclesEmulated;
 
-#define RING_SIZE (256)
+#define RING_SIZE (4096)
 extern uint32_t ringBufGPIO[ RING_SIZE ];
 extern uint32_t ringTime[ RING_SIZE ];
 extern uint16_t ringWrite;
@@ -560,7 +562,6 @@ FASTRUN void AudioStreamSID::update()
       cyclesToEmulatePerRun += 3;
     if ( activeSID2 || activeFM )
       cyclesToEmulatePerRun = 22;
-    
   #else
     int32_t cyclesToEmulatePerRun = 16;
     if ( activeSID2 || activeFM )
@@ -597,9 +598,15 @@ FASTRUN void AudioStreamSID::update()
     
     // check if next SID-command comes earlier
     // this is crucial to play tunes with elaborate sample techniques correctly
+  #ifdef FIRMWARE_C128
+    if ( ringRead != ringWrite && !activeSID2 && SID2_MODEL == 6581 )
+      cyclesToNextWrite = ringTime[ ringRead ] - nCyclesEmulated; else
+      cyclesToNextWrite = 0xffffffff;
+  #else
     if ( ringRead != ringWrite )
       cyclesToNextWrite = ringTime[ ringRead ] - nCyclesEmulated; else
       cyclesToNextWrite = 0xffffffff;
+  #endif
 
 
     do { // do SID emulation until time passed to create an additional sample (i.e. there may be several loops until a sample value is created)
@@ -640,6 +647,15 @@ FASTRUN void AudioStreamSID::update()
         {
           #ifdef EMULATE_OPL2
           activeFM = true; ym3812_write( pOPL, ( A >> 4 ) & 1, D );
+          if ( pOPL->address == 1 )
+          {
+            if ( D == 4 ) // enable digi hack
+              hack_OPL_Sample_Enabled = 1;  else
+              hack_OPL_Sample_Enabled = 0;
+          }
+          if ( hack_OPL_Sample_Enabled && pOPL->address == 0xa0 ) // enable digi hack
+            hack_OPL_Sample_Value = D; else
+            hack_OPL_Sample_Value = 0;
           #endif
         } else
         {
@@ -739,6 +755,9 @@ FASTRUN void AudioStreamSID::update()
       // todo: bulk updates only for C128?
       ym3812_update_one( pOPL, &valOPL, 1 ); 
 
+      if ( hack_OPL_Sample_Enabled )
+        valOPL = (uint16_t)hack_OPL_Sample_Value << 5;
+
       // TODO asynchronous read back is an issue...
       //fmOutRegister = encodeGPIO( ym3812_read( pOPL, 0 ) ); 
     }
@@ -833,6 +852,15 @@ FASTRUN void AudioStreamSID::update()
           #ifdef EMULATE_OPL2
           activeFM = true;
           ym3812_write( pOPL, ( A >> 4 ) & 1, D );
+          if ( pOPL->address == 1 )
+          {
+            if ( D == 4 ) // enable digi hack
+              hack_OPL_Sample_Enabled = 1;  else
+              hack_OPL_Sample_Enabled = 0;
+          }
+          if ( hack_OPL_Sample_Enabled && pOPL->address == 0xa0 ) // enable digi hack
+            hack_OPL_Sample_Value = D; else
+            hack_OPL_Sample_Value = 0;
           #endif
         } else
         {
@@ -897,15 +925,26 @@ FASTRUN void AudioStreamSID::update()
     } while ( samplesElapsed == samplesElapsedBefore );
 
     extern uint8_t outRegisters[ 32 ];
+    extern uint8_t outRegisters_2[ 32 ];
     if ( useSID16 )
     {
       outRegisters[ 0x1b ] = sid16_1->read( 0x1b );
       outRegisters[ 0x1c ] = sid16_1->read( 0x1c );
+      if ( activeSID2 )
+      {
+        outRegisters_2[ 0x1b ] = sid16_2->read( 0x1b );
+        outRegisters_2[ 0x1c ] = sid16_2->read( 0x1c );
+      }
     } else
     {
       #ifndef NO_RESID10
       outRegisters[ 0x1b ] = sid_1->read( 0x1b );
       outRegisters[ 0x1c ] = sid_1->read( 0x1c );
+      if ( activeSID2 )
+      {
+        outRegisters_2[ 0x1b ] = sid_2->read( 0x1b );
+        outRegisters_2[ 0x1c ] = sid_2->read( 0x1c );
+      }
       #endif
     }
 
@@ -915,6 +954,9 @@ FASTRUN void AudioStreamSID::update()
     if ( activeFM )
     {
       ym3812_update_one( pOPL, &valOPL, 1 ); 
+
+      if ( hack_OPL_Sample_Enabled )
+        valOPL = (uint16_t)hack_OPL_Sample_Value << 5;
 
       // TODO asynchronous read back is an issue...
       //fmOutRegister = encodeGPIO( ym3812_read( pOPL, 0 ) ); 

@@ -11,7 +11,7 @@
 
   SIDKick - SID-replacement with SID, Sound Expander and MIDI Emulation based on Teensy 4.1
            (using reSID by Dag Lem and FMOPL by Jarek Burczynski, Tatsuyuki Satoh, Marco van den Heuvel, and Acho A. Tang)
-  Copyright (c) 2019-2021 Carsten Dachsbacher <frenetic@dachsbacher.de>
+  Copyright (c) 2019-2022 Carsten Dachsbacher <frenetic@dachsbacher.de>
 
   Logo created with http://patorjk.com/software/taag/
 
@@ -106,6 +106,14 @@ uint32_t debounceCycle = 0;
 uint32_t c64CycleCount, c64CycleCountResetReleased;
 uint32_t nCyclesEmulated;
 
+#ifdef SID_WRITE_ONLY_MODE_SUPPORT
+#define SID_ONLY_OFF      0
+#define SID_ONLY_ENABLE   1
+#define SID_ONLY_DISABLE  2
+#define SID_ONLY_ACTIVE   3
+uint8_t  sidOnlyMode = SID_ONLY_OFF;
+#endif
+
 uint8_t  addrLine = 0;
 uint32_t fmFakeOutput = 0;
 uint32_t fmAutoDetectStep = 0;
@@ -176,7 +184,11 @@ static uint8_t doNotTriggerIRQAgainThisCycle = 0;
 #ifdef FANCY_LED
 #define MAX_NUM_LEDS 32
 const uint8_t ledPin = 31;
-const int LED_HIGH_DURATION = 200; // the ISR seems to take long enough that this explicit delay is unnecessary
+#ifdef FIRMWARE_C128
+const int LED_HIGH_DURATION = 210; // ISR takes long enough that this explicit delay is unnecessary, except for SID-write-only-mode
+#else
+const int LED_HIGH_DURATION = 175; // ISR takes long enough that this explicit delay is unnecessary, except for SID-write-only-mode
+#endif
 uint32_t NUM_LEDS = MAX_NUM_LEDS;
 uint32_t ledWriteRGB[MAX_NUM_LEDS] = { 0 };
 uint8_t  ledCurRGB = 0;
@@ -190,7 +202,7 @@ extern uint32_t nLEDsConfigTool;
 uint32_t nLEDsConfigTool = 0;
 #endif
 
-#define RING_SIZE (256)
+#define RING_SIZE (4096)
 uint32_t ringBufGPIO[ RING_SIZE ];
 uint32_t ringTime[ RING_SIZE ];
 uint16_t ringWrite;
@@ -447,6 +459,16 @@ void resetEmulation()
   c64CycleCountResetReleased = 
   c64CycleCount = 10;
 
+#ifdef SID_WRITE_ONLY_MODE_SUPPORT
+  if ( sidOnlyMode == SID_ONLY_DISABLE || sidOnlyMode == SID_ONLY_ACTIVE )
+  {
+    detachInterrupt( digitalPinToInterrupt( pinPHI2 ) );
+    attachInterrupt( digitalPinToInterrupt( pinPHI2 ), isrSID, RISING );
+    Serial.println( "[init] normal mode");
+  }
+  sidOnlyMode = SID_ONLY_OFF;
+#endif
+
   extern uint8_t firstBufferAfterReset;
   firstBufferAfterReset = 0;
 
@@ -577,6 +599,23 @@ void loop()
     extern bool driveLEDs;
     driveLEDs = true;
   }
+
+#ifdef SID_WRITE_ONLY_MODE_SUPPORT
+  if ( sidOnlyMode == SID_ONLY_ENABLE )
+  {
+    detachInterrupt( digitalPinToInterrupt( pinPHI2 ) );
+    attachInterrupt( digitalPinToInterrupt( pinPHI2 ), isrSIDOnly, RISING );
+    sidOnlyMode = SID_ONLY_ACTIVE;
+    Serial.println( "SID-only mode");
+  } else
+  if ( sidOnlyMode == SID_ONLY_DISABLE )
+  {
+    detachInterrupt( digitalPinToInterrupt( pinPHI2 ) );
+    attachInterrupt( digitalPinToInterrupt( pinPHI2 ), isrSID, RISING );
+    sidOnlyMode = SID_ONLY_OFF;
+    Serial.println( "normal mode");
+  } 
+#endif
   
 #if ( audioDevice == 0 )
   mqs->poll_update();
@@ -704,6 +743,268 @@ FASTRUN void isrDetermineClockFrequency()
   }
   c64CycleCount ++;
 }
+
+#ifdef SID_WRITE_ONLY_MODE_SUPPORT
+FASTRUN void isrSIDOnly()
+{
+  if ( ARM_DWT_CYCCNT > 100000 )
+    sidOnlyMode = SID_ONLY_DISABLE;
+  
+  // for accurate timing
+  CPU_RESET_CYCLECOUNTER;
+
+  c64CycleCount ++;
+
+  if ( disableISR )
+    return;
+
+  register uint32_t data_7, data_9;
+  register uint32_t signals, sid2;
+  register uint32_t data, A = 0;
+
+  #ifdef C128_D500_SUPPORT
+  uint8_t sid2_d500 = 0;
+  #endif
+
+  // C128 needs a delay
+  #ifdef FIRMWARE_C128
+  // shorter delays result in invalid RW line
+  do { } while (ARM_DWT_CYCCNT < 20 * TEENSY_CLOCK / 600 );
+  #endif
+
+  // GPIO Bank #9: Phi2, CS, ...
+  #define IMXRT_GPIO9_DIRECT (*(volatile uint32_t *)0x4200C000)
+  data_9 = IMXRT_GPIO9_DIRECT;
+
+  #ifdef FIRMWARE_C128
+  if ( !( data_9 & CORE_PIN2_BITMASK ) ) // CPU writes to bus
+  {
+    do { } while (ARM_DWT_CYCCNT < 60 * TEENSY_CLOCK / 600 );
+    data_9 = IMXRT_GPIO9_DIRECT;
+  }
+  #endif
+
+  // read  A5..8, IO1, IO2, RESET
+  // this must not happen earlier, at least on a C128 (the above delay 15 or 20 + read data_9 is sufficient)
+  #define IMXRT_GPIO7_DIRECT (*(volatile uint32_t *)0x42004000)
+  data_7 = IMXRT_GPIO7_DIRECT;
+
+  #ifdef C128_D500_SUPPORT
+  register uint32_t temp_7;
+  temp_7 = data_7;
+  data_7 &= ~CORE_PIN37_BITMASK;
+  #endif
+  
+  //
+  // is (any) SID selected?
+  //
+  extern uint32_t SID2_ADDR;
+  signals = ( ( data_7 ^ DUAL_SID_FLIPMASK ) & DUAL_SID_FLIPMASK ) | ( data_7 & DUAL_SID_ADDR_MASK );
+  sid2 = (signals & SID2_ADDR);
+
+  #ifdef C128_D500_SUPPORT
+  if ( ( SID2_ADDR & CORE_PIN37_BITMASK ) &&  // D500?
+       !( temp_7 & CORE_PIN36_BITMASK ) &&    // MMU Pin 47 (C64-Mode = low)
+       !( temp_7 & CORE_PIN37_BITMASK ) &&    // A8 (read at U3 pin 14)
+       !( data_9 & CORE_PIN2_BITMASK ) &&
+       c64CycleCount > 500000 )
+  {
+    sid2_d500 = sid2 = 1;
+    extern uint32_t SID2_MODEL;
+    if ( SID2_MODEL == 0 )
+    {
+      sid2 = 0;
+      #ifdef C128_D500_SUPPORT
+      sid2_d500 = 0;
+      #endif
+    }
+  }
+  data_7 = temp_7;
+  #endif
+
+  uint8_t tasksToDo = 0;
+  if ( !( data_9 & CORE_PIN3_BITMASK ) // Chip Select
+    #ifdef C128_D500_SUPPORT
+       || sid2_d500
+    #endif
+       || ( (SID2_ADDR & DUAL_SID_FLIPMASK) && sid2 ) )
+    tasksToDo |= 1;
+
+  if ( ( tasksToDo & ( 1 + 4 + 8 ) ) && !( data_9 & CORE_PIN2_BITMASK ) ) 
+  {
+    setD07_Read();
+    CORE_PIN6_PORTCLEAR = CORE_PIN6_BITMASK;
+  }
+
+  /*
+          ___  __
+    |    |__  |  \
+    |___ |___ |__/
+
+  */
+  #ifdef FANCY_LED
+
+  // 0 = do nothing
+  // 1 = writing '0', need to do something before we quit the FIQ-handler
+  // 2 = started writing a '1', need to switch low next cycle
+  // 3 = started writing the interbit gap (T0L, T1L), can do more work next time
+  // 4 + x = wait for x more cycles (reset signal)
+  // 5 = wait to send reset signal
+  // -1 = do nothing
+  extern bool driveLEDs;
+  static uint8_t ledUpdate = 0;
+  if ( driveLEDs && tasksToDo == 0 && ( (++ledUpdate & 3) == 0 || ledWriteStatus == 1 ) )
+  {
+    switch (ledWriteStatus)
+    {
+      case 0:
+        {
+          if ( ledBits2Write || ledColors2Write )
+          {
+            static uint32_t currentLEDColor;
+            if ( ledBits2Write == 0 && ledColors2Write ) // next led
+            {
+              currentLEDColor = ledWriteRGB[ ( (NUM_LEDS - ledColors2Write) + ledColorsBufOfs ) % NUM_LEDS ];
+              ledColors2Write --;
+              ledBits2Write = 24;
+            }
+
+            // transmit next bit
+            register uint8_t bit = ( currentLEDColor >> 23 ) & 1;
+            currentLEDColor <<= 1;
+            ledBits2Write --;
+            if ( bit && !ledPinStatus )
+              CORE_PIN31_PORTSET = CORE_PIN31_BITMASK;
+            ledPinStatus = bit;
+
+            ledWriteStatus = bit + 1;
+          } else
+          {
+            // transmit reset, this delay (must be >5) is essential for the update-rate of the LED-animation
+            ledWriteStatus = 5 + 200 * 4;
+            if ( ledPinStatus )
+              CORE_PIN31_PORTCLEAR = CORE_PIN31_BITMASK;
+            ledPinStatus = 0;
+          }
+          break;
+        }
+
+      case 1:
+        if ( !ledPinStatus )
+          CORE_PIN31_PORTSET = CORE_PIN31_BITMASK;
+        ledPinStatus = 1;
+        ledWriteStatus = 4;
+        break;
+      
+      case 2:
+        if ( ledPinStatus )
+          CORE_PIN31_PORTCLEAR = CORE_PIN31_BITMASK;
+        ledPinStatus = 0;
+        ledWriteStatus = 0;
+        break;
+
+      case 5:
+        ledWriteStatus = -1;
+
+      default:
+        if ( ledWriteStatus >= 6 )
+          ledWriteStatus --;
+        break;
+    }
+  }
+#endif // FANCY_LED
+
+  // read signals:  A0..4 (D0..7 are only on this port, but the level shifter is not set to read here)
+  if ( tasksToDo & ~2 )
+  {
+    #define IMXRT_GPIO6_DIRECT (*(volatile uint32_t *)0x42000000)
+    data = IMXRT_GPIO6_DIRECT;
+
+    A = ( ( data & ( 1 << CORE_PIN0_BIT ) ) >> CORE_PIN0_BIT ) |
+        ( ( data & ( 3 << CORE_PIN24_BIT ) ) >> ( CORE_PIN24_BIT - 1 ) ) |
+        ( ( data & ( 3 << CORE_PIN26_BIT ) ) >> ( CORE_PIN26_BIT - 3 ) );
+  }
+
+  if ( ( tasksToDo & 127 ) == 0 )
+    goto noSID_FM_MIDI_Commands_2;
+
+  /*
+     __     __      __        __                     __               __
+    /__` | |  \    |__) |  | /__`    |__|  /\  |\ | |  \ |    | |\ | / _`
+    .__/ | |__/    |__) \__/ .__/    |  | /~~\ | \| |__/ |___ | | \| \__>
+
+  */
+  if ( tasksToDo & 1 )
+  {
+    if ( ( data_9 & CORE_PIN2_BITMASK ) ) // RW -> READ
+    {
+      //
+      // CPU reads SID register
+      //
+    } else
+    {
+      //
+      // CPU writes to SID
+      //
+      register uint8_t D = readDataPins();
+
+      A &= 0x1f;
+
+      if ( A <= 24 )
+      {
+        // pseudo stereo?
+        if ( SID2_ADDR == (uint32_t)(1 << 31) )
+          // yes, flag command for both SIDs
+          ringBufGPIO[ ringWrite ] = D | ( A << 8 ) | ( 1 << 21 ); else
+          // command is only for one of the SIDs
+          ringBufGPIO[ ringWrite ] = D | ( A << 8 ) | ( sid2 ? 1 << 20 : 0 );
+        ringTime[ ringWrite ] = c64CycleCount + nSIDFMDelay;
+        ringWrite++;
+        ringWrite &= ( RING_SIZE - 1 );
+      }
+    }
+  }
+
+noSID_FM_MIDI_Commands_2:
+  /*
+     __   ___  __   ___ ___
+    |__) |__  /__` |__   |
+    |  \ |___ .__/ |___  |
+
+  */
+  if ( !(data_7 & CORE_PIN32_BITMASK) ) // reset
+  {
+    sidOnlyMode = SID_ONLY_DISABLE;
+    if ( doReset == 0 ) doReset = 1;
+  } else 
+  if ( doReset == 2 )
+  {
+    doReset = 0;
+    c64CycleCountResetReleased = c64CycleCount;
+  }
+
+handleLED_and_quit_FIQ_2:
+  if ( 0 ){};
+  /*
+          ___  __
+    |    |__  |  \
+    |___ |___ |__/
+
+  */
+#ifdef FANCY_LED
+  if ( ledWriteStatus == 4 )
+  {
+    if ( ledPinStatus )
+    {
+      do {} while ( ARM_DWT_CYCCNT < ( LED_HIGH_DURATION * TEENSY_CLOCK / 600 ) );
+      CORE_PIN31_PORTCLEAR = CORE_PIN31_BITMASK;
+    }
+    ledPinStatus = 0;
+    ledWriteStatus = 0;
+  }
+#endif
+}
+#endif
 
 
 FASTRUN void isrSID()
@@ -1163,9 +1464,20 @@ FASTRUN void isrSID()
           {
             stateInVisualizationMode = CONFIG_MODE_CYCLES;
             addrLine = 0;
-          }
+          } else
           if ( D == 0xff )
+          {
             stateInConfigMode = CONFIG_MODE_CYCLES; // SID remains in config mode for 1/40sec
+          } 
+#ifdef SID_WRITE_ONLY_MODE_SUPPORT
+          else if ( D == 0xfd )
+          {
+            sidOnlyMode = SID_ONLY_ENABLE;
+            stateInConfigMode = 
+            stateInTransferMode =
+            stateInVisualizationMode = 0;
+          }
+#endif
         
           goto noSID_FM_MIDI_Commands;
         } else if ( stateInConfigMode > 0 )
@@ -1498,6 +1810,10 @@ handleLED_and_quit_FIQ:;
   
   if ( /*!subsample && */!(data_7 & CORE_PIN32_BITMASK) ) // reset
   {
+#ifdef SID_WRITE_ONLY_MODE_SUPPORT
+    if ( sidOnlyMode != SID_ONLY_OFF )
+      sidOnlyMode = SID_ONLY_DISABLE;
+#endif
     if ( doReset == 0 )
     {
       doReset = 1;
@@ -1710,7 +2026,8 @@ handleLED_and_quit_FIQ:;
   
     }
   }
-  
+
+
   /*
           ___  __
     |    |__  |  \
@@ -1722,7 +2039,7 @@ handleLED_and_quit_FIQ:;
   {
     if ( ledPinStatus )
     {
-      //do {} while ( ARM_DWT_CYCCNT < ( LED_HIGH_DURATION * TEENSY_CLOCK / 600 ) );
+      do {} while ( ARM_DWT_CYCCNT < ( LED_HIGH_DURATION * TEENSY_CLOCK / 600 ) );
       CORE_PIN31_PORTCLEAR = CORE_PIN31_BITMASK;
     }
     ledPinStatus = 0;

@@ -10,7 +10,7 @@
 
   SIDKick - SID-replacement with SID, Sound Expander and MIDI Emulation based on Teensy 4.1
            (using reSID by Dag Lem and FMOPL by Jarek Burczynski, Tatsuyuki Satoh, Marco van den Heuvel, and Acho A. Tang)
-  Copyright (c) 2019-2021 Carsten Dachsbacher <frenetic@dachsbacher.de>
+  Copyright (c) 2019-2022 Carsten Dachsbacher <frenetic@dachsbacher.de>
 
   Logo created with http://patorjk.com/software/taag/
 
@@ -47,13 +47,15 @@
 #endif
 
 // define if MIDI device emulation to be included in the firmware
-#define SUPPORT_MIDI
+//#define SUPPORT_MIDI
 
 // define if WS2818b-LED support to be included in the firmware
-#define FANCY_LED
+//#define FANCY_LED
 
 // define this to use the sample generation routine which adapts to the actual C64/C128 clock 
 #define DYNAMIC_ADJUSTMENT_MIXER
 
+// support SID-write only mode
+#define SID_WRITE_ONLY_MODE_SUPPORT
 
 //#define DEBUG_OUTPUT
