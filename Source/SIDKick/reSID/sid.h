@@ -104,9 +104,10 @@ public:
   // 16-bit output (AUDIO OUT).
   short output();
 
+  int clock_fast(cycle_count& delta_t, short* buf, int n, int interleave);
+
  protected:
   static double I0(double x);
-  int clock_fast(cycle_count& delta_t, short* buf, int n, int interleave);
   int clock_interpolate(cycle_count& delta_t, short* buf, int n, int interleave);
   int clock_resample(cycle_count& delta_t, short* buf, int n, int interleave);
   int clock_resample_fastmem(cycle_count& delta_t, short* buf, int n, int interleave);
@@ -183,7 +184,8 @@ public:
 // ----------------------------------------------------------------------------
 // Read 16-bit sample from audio output.
 // ----------------------------------------------------------------------------
-RESID_INLINE
+//RESID_INLINE
+__attribute__((always_inline)) inline
 short SID::output()
 {
   return extfilt.output();

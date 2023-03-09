@@ -86,11 +86,18 @@ RESID_NAMESPACE_START
 // (GNU Coding Standards: Portability between CPUs), so this should be
 // a valid assumption.
 
+typedef unsigned char reg4;
+typedef unsigned char reg8;
+typedef unsigned short reg12;
+typedef unsigned short reg16;
+typedef unsigned int reg24;
+/*
 typedef unsigned int reg4;
 typedef unsigned int reg8;
 typedef unsigned int reg12;
 typedef unsigned int reg16;
 typedef unsigned int reg24;
+*/
 
 typedef int cycle_count;
 typedef short short_point[2];

@@ -70,8 +70,8 @@ protected:
   cycle_count envelope_pipeline;
   cycle_count exponential_pipeline;
   cycle_count state_pipeline;
-  bool hold_zero;
-  bool reset_rate_counter;
+  reg8 hold_zero;
+  reg8 reset_rate_counter;
 
   reg4 attack;
   reg4 decay;
@@ -159,7 +159,7 @@ void EnvelopeGenerator::clock()
   }
   else if (unlikely(reset_rate_counter)) {
     rate_counter = 0;
-    reset_rate_counter = false;
+    reset_rate_counter = 0;
 
     if (state == ATTACK) {
       // The first envelope step in the attack state also resets the exponential
@@ -192,14 +192,15 @@ void EnvelopeGenerator::clock()
     }
   }
   else
-    reset_rate_counter = true;
+    reset_rate_counter = 1;
 }
 
 
 // ----------------------------------------------------------------------------
 // SID clocking - delta_t cycles.
 // ----------------------------------------------------------------------------
-RESID_INLINE
+//RESID_INLINE
+__attribute__((always_inline)) inline
 void EnvelopeGenerator::clock(cycle_count delta_t)
 {
   // NB! Any pipelined envelope counter decrement from single cycle clocking
@@ -208,13 +209,13 @@ void EnvelopeGenerator::clock(cycle_count delta_t)
   if (unlikely(state_pipeline)) {
     if (next_state == ATTACK) {
       state = ATTACK;
-      hold_zero = false;
+      hold_zero = 0;
       rate_period = rate_counter_period[attack];
     } else if (next_state == RELEASE) {
       state = RELEASE;
       rate_period = rate_counter_period[release];
     } else if (next_state == FREEZED) {
-      hold_zero = true;
+      hold_zero = 1;
     }
     state_pipeline = 0;
   }
@@ -228,27 +229,35 @@ void EnvelopeGenerator::clock(cycle_count delta_t)
   //
 
   // NB! This requires two's complement integer.
-  int rate_step = rate_period - rate_counter;
+  register int rate_step asm( "r3" ) = rate_period - rate_counter;
   if (unlikely(rate_step <= 0)) {
     rate_step += 0x7fff;
   }
 
-  while (delta_t) {
+  register int rc asm( "r3" ) = rate_counter;
+  register int dt asm( "r7" ) = delta_t;
+
+  while (dt) {
     // SIDKICK: this env3=... was missing, as a consequence reading 0x1c does not return (correct) values when emulating several cycles at once
     // The ENV3 value is sampled at the first phase of the clock
     env3 = envelope_counter;
 
-    if (delta_t < rate_step) {
+    if (dt < rate_step) {
       // likely (~65%)
-      rate_counter += delta_t;
-      if (unlikely(rate_counter & 0x8000)) {
-        ++rate_counter &= 0x7fff;
+      rc += dt;
+      if (unlikely(rc & 0x8000)) {
+        ++rc &= 0x7fff;
       }
+
+//das hier hatte ich vergessen
+  rate_counter = rc;
+
+
       return;
     }
 
-    rate_counter = 0;
-    delta_t -= rate_step;
+    rc = 0;
+    dt -= rate_step;
 
     // The first envelope step in the attack state also resets the exponential
     // counter. This has been verified by sampling ENV3.
@@ -301,13 +310,15 @@ void EnvelopeGenerator::clock(cycle_count delta_t)
         exponential_counter_period = new_exponential_counter_period;
         new_exponential_counter_period = 0;
         if (next_state == FREEZED) {
-          hold_zero = true;
+          hold_zero = 1;
         }
       }
     }
 
     rate_step = rate_period;
   }
+
+  rate_counter = rc;
 }
 
 /**
@@ -363,7 +374,7 @@ void EnvelopeGenerator::state_change()
       } else if (state_pipeline == 0) {
         // The attack register is correctly activated during second cycle of attack phase
         rate_period = rate_counter_period[attack];
-        hold_zero = false;
+        hold_zero = 0;
       }
       break;
     case DECAY_SUSTAIN:
@@ -382,7 +393,7 @@ void EnvelopeGenerator::state_change()
     case FREEZED:
       if (state_pipeline == 0) {
         state = FREEZED;
-        hold_zero = true;
+        hold_zero = 1;
      }
   }
 }

@@ -17,7 +17,9 @@
 //  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 //  ---------------------------------------------------------------------------
 
-// please note: there are some modifications in this file to be used with SIDKick!
+// please note: there are some modifications in this file to be used with SIDKick, and also some 
+//              alternative solutions to the classic LUTs used in original reSID
+//
 
 #define RESID_FILTER_CC
 
@@ -34,9 +36,32 @@
 #include <stdlib.h>
 #include <string.h>
 
+extern void *allocPool( int size );
+
 RESID_NAMESPACE_START
 
+#define v1 fstate[ 0 ]
+#define v2 fstate[ 1 ]
+#define v3 fstate[ 2 ]
+#define ve fstate[ 3 ]
+#define Vlp fstate[ 4 ]
+#define Vbp fstate[ 5 ]
+#define Vhp fstate[ 6 ]
+
+#define Vbp_x fstate[ 7 ]
+#define Vbp_vc fstate[ 8 ]
+#define Vlp_x fstate[ 9 ]
+#define Vlp_vc fstate[ 10 ]
+
 #include  <avr/pgmspace.h>
+
+#pragma pack(push,1)
+#include "gainmixer.h"
+#pragma pack(pop)
+
+FITCURVELUT fgainmixer[ 2 ][ 16 ][ 8 ];
+signed short *globCoeff;
+
 #ifdef PRECALC_TABLES
 #ifdef HIGH_PRECISION_TABLES
 #include "resid_precalc_4_4.h"
@@ -289,8 +314,12 @@ Filter::Filter()
 
   //if (!class_init) 
   {
-
     #if SUB_SAMPLE_PRE == 4
+  static int doOnlyOnce2 = 1;
+
+  if ( doOnlyOnce2 )
+  {
+    doOnlyOnce2 = 0;
     opamp_rev0 = new unsigned short[ 16384 ];
     memcpy( opamp_rev0, opamp_rev0_slow, sizeof( unsigned short ) * 16384 );
     opamp_rev1 = new unsigned short[ 16384 ];
@@ -299,7 +328,7 @@ Filter::Filter()
     memcpy( vcr_kVg_precalc, vcr_kVg_precalc_slow, sizeof( unsigned short ) * 16384 );
     vcr_n_Ids_term_precalc = new unsigned short[ 16384 ];
     memcpy( vcr_n_Ids_term_precalc, vcr_n_Ids_term_precalc_slow, sizeof( unsigned short ) * 16384 );
-
+  }
 /*    gain0 = new unsigned short[ ( 16 * 16384 ) / 4 ];
     gain1 = new unsigned short[ ( 16 * 16384 ) / 4 ];
 
@@ -542,9 +571,9 @@ Filter::Filter()
             solve_gain(opamp, n_idiv, vi/idiv, x, mf);
         }
 #else
-        if ( m == 0 )
+        /*if ( m == 0 )
           mf.mixer = &mixer0[0]; else
-          mf.mixer = &mixer1[0];
+          mf.mixer = &mixer1[0];*/
 #endif
 
         offset += size;
@@ -712,6 +741,26 @@ Filter::Filter()
 
     }
 
+    //
+    // convert globCoeff indices into pointers!
+    //
+    static int doOnlyOnce = 1;
+
+    if ( doOnlyOnce )
+    {
+      doOnlyOnce = 0;
+
+      globCoeff = (short int *)allocPool( sizeof( signed short ) * 21957 );
+      memcpy( globCoeff, globCoeff_slow, sizeof( signed short ) * 21957 );
+
+      for ( int m = 0; m < 2; m++ )
+          for ( int vol = 0; vol < 16; vol ++ )
+          {
+            memcpy( &fgainmixer[ m ][ vol ][ 0 ], &fgainmixer_slow[ m ][ vol ][ 0 ], sizeof( FITCURVELUT ) * 8 );
+            for ( int j = 0; j < 8; j++ )
+              fgainmixer[ m ][ vol ][ j ].coeffsIdx = (unsigned long)&globCoeff[ fgainmixer[ m ][ vol ][ j ].coeffsIdx ];
+          }
+    }
     //class_init = true;
   }
 
@@ -883,6 +932,7 @@ Filter::Filter()
 	}
 #endif
 
+
   enable_filter(true);
   set_chip_model(MOS6581);
   set_voice_mask(0x07);
@@ -935,6 +985,8 @@ void Filter::set_chip_model(chip_model model)
   Vhp = 0;
   Vbp = Vbp_x = Vbp_vc = 0;
   Vlp = Vlp_x = Vlp_vc = 0;
+
+  prefetchMixer();
 }
 
 
@@ -1001,6 +1053,8 @@ void Filter::writeMODE_VOL(reg8 mode_vol)
   set_sum_mix();
 
   vol = mode_vol & 0x0f;
+  prefetchMixer();
+
 }
 
 // Set filter cutoff frequency.
@@ -1115,6 +1169,21 @@ void Filter::set_Q()
   _8_div_Q = ~res & 0x0f;
 }
 
+void Filter::prefetchMixer()
+{
+  int curve = 0;
+    int m = mix;
+    for ( int i = 0; i < 7; i++ )
+    {
+        if ( m & 1 ) curve ++;
+        m >>= 1;
+    }
+
+  crvPrefetch = &fgainmixer[sid_model][ vol ][ curve ];
+  coeffsPrefetch = (signed short*)fgainmixer[ sid_model ][ vol ][ curve ].coeffsIdx;
+
+}
+
 // Set input routing bits.
 void Filter::set_sum_mix()
 {
@@ -1124,7 +1193,23 @@ void Filter::set_sum_mix()
   mix =
     (enabled ? (mode & 0x70) | ((~(filt | (mode & 0x80) >> 5)) & 0x0f) : 0x0f)
     & voice_mask;
+
+    prefetchMixer();
 }
+
+#undef v1
+#undef v2
+#undef v3
+#undef ve
+#undef Vlp
+#undef Vbp
+#undef Vhp
+
+#undef Vbp_x
+#undef Vbp_vc
+#undef Vlp_x
+#undef Vlp_vc
+
 
 RESID_NAMESPACE_STOP
 

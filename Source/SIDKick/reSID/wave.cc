@@ -24,8 +24,24 @@
 
 RESID_NAMESPACE_START
 
+#include  <avr/pgmspace.h>
+
+#define USE_PRECOMPUTED_TABLES
+
+#ifdef USE_PRECOMPUTED_TABLES
+
+#include "model_wave.h" 
+#include "model_dac.h" 
+
+unsigned short model_dac[2][1 << 12] = {
+  {0},
+  {0},
+};
+
+#else
+
 // Waveform lookup tables.
-unsigned short WaveformGenerator::model_wave[2][8][1 << 12] = {
+unsigned short model_wave[2][8][1 << 12] = {
   {
     {0},
     {0},
@@ -50,11 +66,19 @@ unsigned short WaveformGenerator::model_wave[2][8][1 << 12] = {
 
 
 // DAC lookup tables.
-unsigned short WaveformGenerator::model_dac[2][1 << 12] = {
+unsigned short model_dac[2][1 << 12] = {
   {0},
   {0},
 };
 
+unsigned short model_dac0[ 1 << 6 ];
+unsigned short model_dac1[ 1 << 6 ];
+unsigned char model_dac0_8[ 1 << 6 ];
+unsigned char model_dac1_8[ 1 << 6 ];
+
+unsigned char model_wave8[ 2 ][ 4 ][ 1 << 12 ];
+
+#endif
 
 // ----------------------------------------------------------------------------
 // Constructor.
@@ -64,21 +88,119 @@ WaveformGenerator::WaveformGenerator()
   static bool class_init;
 
   if (!class_init) {
-    // Calculate tables for normal waveforms.
+  #ifndef USE_PRECOMPUTED_TABLES
+      // Calculate tables for normal waveforms.
     accumulator = 0;
     for (int i = 0; i < (1 << 12); i++) {
       reg24 msb = accumulator & 0x800000;
 
+      if ( i == 0 )
+          i = i;
+
       // Noise mask, triangle, sawtooth, pulse mask.
       // The triangle calculation is made branch-free, just for the hell of it.
-      model_wave[0][0][i] = model_wave[1][0][i] = 0xfff;
+      /*model_wave[0][0][i] = model_wave[1][0][i] = 0xfff;
       model_wave[0][1][i] = model_wave[1][1][i] = ((accumulator ^ -!!msb) >> 11) & 0xffe;
       model_wave[0][2][i] = model_wave[1][2][i] = accumulator >> 12;
-      model_wave[0][4][i] = model_wave[1][4][i] = 0xfff;
+      model_wave[0][4][i] = model_wave[1][4][i] = 0xfff;*/
+
+      for ( int k = 0; k < 2; k++ )
+      {
+          model_wave8[ k ][ 0 ][ i ] = model_wave[ k ][ 3 ][ i ] >> 4;
+          model_wave8[ k ][ 1 ][ i ] = model_wave[ k ][ 5 ][ i ] >> 4;
+          model_wave8[ k ][ 2 ][ i ] = model_wave[ k ][ 6 ][ i ] >> 4;
+          model_wave8[ k ][ 3 ][ i ] = model_wave[ k ][ 7 ][ i ] >> 4;
+      }
+
+      /*for ( int k = 0; k < 8; k++ )
+      {
+          model_wave8[ 0 ][ k ][ i ] = model_wave[ 0 ][ k ][ i ] >> 4;
+          model_wave8[ 1 ][ k ][ i ] = model_wave[ 1 ][ k ][ i ] >> 4;
+      }*/
 
       accumulator += 0x1000;
     }
 
+    // Build DAC lookup tables for 12-bit DACs.
+
+    // MOS 8580: 2R/R ~ 2.00, correct termination.
+    build_dac_table_fac( 12, 2.00, true, model_dac0, model_dac1 );
+
+    // MOS 6581: 2R/R ~ 2.20, missing termination resistor.
+    build_dac_table_fac( 12, 2.50, false, model_dac0, model_dac1 );
+
+    for ( int i = 0; i < 1 << 6; i++ )
+    {
+        model_dac0_8[ i ] = model_dac0[ i ];
+        int v = model_dac1[ i ] - i * 64 + 128 + 16;
+        if ( v < 0 ) v = 0; 
+        if ( v > 255 ) v = 255;
+        model_dac1_8[ i ] = v;
+    }
+
+    {
+        FILE *f = fopen( "model_wave.h", "wt" );
+        fprintf( f, "const unsigned char model_wave8[ 2 ][ 4 ][ 4096 ] DMAMEM = {\n" );
+        for ( int k = 0; k < 2; k++ )
+        {
+            fprintf( f, "{ " );
+            for ( int j = 0; j < 4; j++ )
+            {
+                fprintf( f, "{ " );
+                for ( int i = 0; i < 1 << 12; i++ )
+                {
+                    if ( ( i & 31 ) == 31 )
+                        fprintf( f, "\n  " );
+                    fprintf( f, "%3d, ", (int)model_wave8[ k ][ j ][ i ] );
+                }
+                fprintf( f, "},\n" );
+            }
+            fprintf( f, "},\n" );
+        }
+        fprintf( f, "};\n\n" );
+        fclose( f );
+        exit( 1 );
+    }
+    {
+        FILE *f = fopen( "model_dac.h", "wt" );
+        fprintf( f, "const unsigned char model_dac0_8[ 64 ] DMAMEM = {\n" );
+        for ( int i = 0; i < 1 << 6; i++ )
+            fprintf( f, "%3d, ", (int)model_dac0_8[ i ] );
+        fprintf( f, "};\n\n" );
+        fprintf( f, "const unsigned char model_dac1_8[ 64 ] DMAMEM = {\n" );
+        for ( int i = 0; i < 1 << 6; i++ )
+            fprintf( f, "%3d, ", (int)model_dac1_8[ i ] );
+        fprintf( f, "};\n\n" );
+        fclose( f );
+        exit( 1 );
+    }
+       /*FILE *f = fopen( "model_dac.data", "wt" );
+    for ( int i = 0; i < 1 << 6; i++ )
+        fprintf( f, "%d %d\n", i, model_dac0[ i ] );
+    int minV = 11111, maxV = -111111;
+    for ( int i = 0; i < 1 << 6; i++ )
+    {
+        int v = model_dac1[ i ] - i * 64 + 128 + 16;
+        if ( v < minV ) minV = v;
+        if ( v > maxV ) maxV = v;
+        if ( v >= 0 && v < 256 ) v = 0;
+        if ( v > 255 ) v = v - 255;
+        fprintf( f, "%d %d\n", i + ( 1 << 6 ), v );
+    }
+    fprintf( f, "min=%d   max=%d\n", minV, maxV );
+    fclose( f );
+    exit( 1 );*/
+
+
+/*    FILE *f = fopen( "model_dac.data", "wt" );
+    for ( int i = 0; i < 1 << 12; i++ )
+        fprintf( f, "%d %1.8f\n", i, (float)model_dac[ 0 ][ i ] );
+    for ( int i = 0; i < 1 << 12; i++ )
+        fprintf( f, "%d %1.8f\n", i + (1<<12), (float)model_dac[ 1 ][ i ] );
+    fclose( f );
+    exit( 1 );*/
+
+#endif
     // Build DAC lookup tables for 12-bit DACs.
     // MOS 6581: 2R/R ~ 2.20, missing termination resistor.
     build_dac_table(model_dac[0], 12, 2.20, false);
@@ -117,7 +239,12 @@ void WaveformGenerator::set_sync_source(WaveformGenerator* source)
 void WaveformGenerator::set_chip_model(chip_model model)
 {
   sid_model = model;
-  wave = model_wave[model][waveform & 0x7];
+ // wave = model_wave[ model ][ waveform & 0x7 ];
+  //wave8 = model_wave8[ model ][ waveform & 0x7 ];
+  unsigned char w7 = waveform & 0x7;
+  if ( w7 >= 5 ) 
+      wave8 = model_wave8[ model ][ w7 - 4 ]; else
+      wave8 = model_wave8[ model ][ 0 ]; 
 }
 
 
@@ -175,7 +302,12 @@ void WaveformGenerator::writeCONTROL_REG(reg8 control)
   sync = control & 0x02;
 
   // Set up waveform table.
-  wave = model_wave[sid_model][waveform & 0x7];
+  //wave = model_wave[ sid_model ][ waveform & 0x7 ];
+  //wave8 = model_wave8[ sid_model ][ waveform & 0x7 ];
+  unsigned char w7 = waveform & 0x7;
+  if ( w7 >= 5 )
+      wave8 = model_wave8[ sid_model ][ w7 - 4 ]; else
+      wave8 = model_wave8[ sid_model ][ 0 ];
 
   // Substitution of accumulator MSB when sawtooth = 0, ring_mod = 1.
   ring_msb_mask = ((~control >> 5) & (control >> 2) & 0x1) << 23;
@@ -265,7 +397,8 @@ void WaveformGenerator::reset()
   ring_mod = 0;
   sync = 0;
 
-  wave = model_wave[sid_model][0];
+  //wave = model_wave[sid_model][0];
+  wave8 = model_wave8[ sid_model ][ 0 ];
 
   ring_msb_mask = 0;
   no_noise = 0xfff;

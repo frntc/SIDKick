@@ -115,14 +115,18 @@ protected:
   chip_model sid_model;
 
   // Sample data for waveforms, not including noise.
-  unsigned short* wave;
-  static unsigned short model_wave[2][8][1 << 12];
-  // DAC lookup tables.
-  static unsigned short model_dac[2][1 << 12];
+  //unsigned short* wave;
+  const unsigned char *wave8;
 
 friend class Voice;
 friend class SID;
 };
+
+extern const unsigned short model_wave[ 2 ][ 8 ][ 1 << 12 ];
+// DAC lookup tables.
+//extern unsigned short model_dac[ 2 ][ 1 << 12 ];
+extern const unsigned char model_dac0_8[ 1 << 6 ];
+extern const unsigned char model_dac1_8[ 1 << 6 ];
 
 
 // ----------------------------------------------------------------------------
@@ -189,9 +193,9 @@ void WaveformGenerator::clock(cycle_count delta_t)
   }
   else {
     // Calculate new accumulator value;
-    reg24 delta_accumulator = delta_t*freq;
-    reg24 accumulator_next = (accumulator + delta_accumulator) & 0xffffff;
-    reg24 accumulator_bits_set = ~accumulator & accumulator_next;
+    register reg24 delta_accumulator asm( "r3" ) = delta_t*freq;
+    register reg24 accumulator_next asm( "r4" ) = (accumulator + delta_accumulator) & 0xffffff;
+    register reg24 accumulator_bits_set asm( "r5" ) = ~accumulator & accumulator_next;
     accumulator = accumulator_next;
 
     // Check whether the MSB is set high. This is used for synchronization.
@@ -202,7 +206,7 @@ void WaveformGenerator::clock(cycle_count delta_t)
 
     // Shift noise register once for each time accumulator bit 19 is set high.
     // Bit 19 is set high each time 2^20 (0x100000) is added to the accumulator.
-    reg24 shift_period = 0x100000;
+    register reg24 shift_period asm( "r6" ) = 0x100000;
 
     while (delta_accumulator) {
       if (likely(delta_accumulator < shift_period)) {
@@ -246,7 +250,8 @@ void WaveformGenerator::clock(cycle_count delta_t)
 // Note that the oscillators must be clocked exactly on the cycle when the
 // MSB is set high for hard sync to operate correctly. See SID::clock().
 // ----------------------------------------------------------------------------
-RESID_INLINE
+//RESID_INLINE
+__attribute__((always_inline)) inline
 void WaveformGenerator::synchronize()
 {
   // A special case occurs when a sync source is synced itself on the same
@@ -312,17 +317,21 @@ void WaveformGenerator::synchronize()
 // The low 4 waveform bits are zero (grounded).
 //
 
-RESID_INLINE void WaveformGenerator::clock_shift_register()
+//RESID_INLINE 
+__attribute__((always_inline)) inline
+void WaveformGenerator::clock_shift_register()
 {
   // bit0 = (bit22 | test) ^ bit17
-  reg24 bit0 = ((shift_register >> 22) ^ (shift_register >> 17)) & 0x1;
+  register reg24 bit0 = ((shift_register >> 22) ^ (shift_register >> 17)) & 0x1;
   shift_register = ((shift_register << 1) | bit0) & 0x7fffff;
 
   // New noise waveform output.
   set_noise_output();
 }
 
-RESID_INLINE void WaveformGenerator::write_shift_register()
+//RESID_INLINE 
+__attribute__((always_inline)) inline
+void WaveformGenerator::write_shift_register()
 {
   // Write changes to the shift register output caused by combined waveforms
   // back into the shift register.
@@ -330,22 +339,26 @@ RESID_INLINE void WaveformGenerator::write_shift_register()
   // FIXME: Write test program to check the effect of 1 bits and whether
   // neighboring bits are affected.
 
+  register unsigned short wo asm( "r3" ) = waveform_output;
+
   shift_register &=
     ~((1<<20)|(1<<18)|(1<<14)|(1<<11)|(1<<9)|(1<<5)|(1<<2)|(1<<0)) |
-    ((waveform_output & 0x800) << 9) |  // Bit 11 -> bit 20
-    ((waveform_output & 0x400) << 8) |  // Bit 10 -> bit 18
-    ((waveform_output & 0x200) << 5) |  // Bit  9 -> bit 14
-    ((waveform_output & 0x100) << 3) |  // Bit  8 -> bit 11
-    ((waveform_output & 0x080) << 2) |  // Bit  7 -> bit  9
-    ((waveform_output & 0x040) >> 1) |  // Bit  6 -> bit  5
-    ((waveform_output & 0x020) >> 3) |  // Bit  5 -> bit  2
-    ((waveform_output & 0x010) >> 4);   // Bit  4 -> bit  0
+    ((wo & 0x800) << 9) |  // Bit 11 -> bit 20
+    ((wo & 0x400) << 8) |  // Bit 10 -> bit 18
+    ((wo & 0x200) << 5) |  // Bit  9 -> bit 14
+    ((wo & 0x100) << 3) |  // Bit  8 -> bit 11
+    ((wo & 0x080) << 2) |  // Bit  7 -> bit  9
+    ((wo & 0x040) >> 1) |  // Bit  6 -> bit  5
+    ((wo & 0x020) >> 3) |  // Bit  5 -> bit  2
+    ((wo & 0x010) >> 4);   // Bit  4 -> bit  0
 
-  noise_output &= waveform_output;
+  noise_output &= wo;
   no_noise_or_noise_output = no_noise | noise_output;
 }
 
-RESID_INLINE void WaveformGenerator::reset_shift_register()
+//RESID_INLINE
+__attribute__((always_inline)) inline
+void WaveformGenerator::reset_shift_register()
 {
   shift_register = 0x7fffff;
   shift_register_reset = 0;
@@ -354,17 +367,20 @@ RESID_INLINE void WaveformGenerator::reset_shift_register()
   set_noise_output();
 }
 
-RESID_INLINE void WaveformGenerator::set_noise_output()
+//RESID_INLINE 
+__attribute__((always_inline)) inline
+void WaveformGenerator::set_noise_output()
 {
+  register int sh asm( "r3" ) = shift_register;
   noise_output =
-    ((shift_register & 0x100000) >> 9) |
-    ((shift_register & 0x040000) >> 8) |
-    ((shift_register & 0x004000) >> 5) |
-    ((shift_register & 0x000800) >> 3) |
-    ((shift_register & 0x000200) >> 2) |
-    ((shift_register & 0x000020) << 1) |
-    ((shift_register & 0x000004) << 3) |
-    ((shift_register & 0x000001) << 4);
+    ((sh & 0x100000) >> 9) |
+    ((sh & 0x040000) >> 8) |
+    ((sh & 0x004000) >> 5) |
+    ((sh & 0x000800) >> 3) |
+    ((sh & 0x000200) >> 2) |
+    ((sh & 0x000020) << 1) |
+    ((sh & 0x000004) << 3) |
+    ((sh & 0x000001) << 4);
 
   no_noise_or_noise_output = no_noise | noise_output;
 }
@@ -448,16 +464,34 @@ RESID_INLINE void WaveformGenerator::set_noise_output()
 // since the waveform bits are and'ed into the shift register via the shift
 // register outputs.
 
-RESID_INLINE
+//RESID_INLINE
+__attribute__((always_inline)) inline
 void WaveformGenerator::set_waveform_output()
 {
   // Set output value.
   if (likely(waveform)) {
     // The bit masks no_pulse and no_noise are used to achieve branch-free
     // calculation of the output value.
-    int ix = (accumulator ^ (~sync_source->accumulator & ring_msb_mask)) >> 12;
+    register int ix asm("r5")  = (accumulator ^ (~sync_source->accumulator & ring_msb_mask)) >> 12;
 
-    waveform_output = wave[ix] & (no_pulse | pulse_output) & no_noise_or_noise_output;
+    // CD
+    if ( ( waveform & 0b011 ) == 0 )
+    {
+        waveform_output = 0xfff;
+    } else
+    if ( ( waveform & 0b011 ) == 1 )
+    {
+        register unsigned int acc asm("r3") = ix << 12;
+        register unsigned int msb asm("r4") = acc & 0x800000;
+        waveform_output = ( ( acc ^ -!!msb ) >> 11 ) & 0xffe;
+    } else
+    if ( ( waveform & 0b011 ) == 2 )
+    {
+        waveform_output = ix;
+    } else
+        waveform_output = wave8[ ix ] << 4;
+
+    waveform_output &= ( no_pulse | pulse_output ) & no_noise_or_noise_output;
 
     // Triangle/Sawtooth output is delayed half cycle on 8580.
     // This will appear as a one cycle delay on OSC3 as it is
@@ -465,7 +499,14 @@ void WaveformGenerator::set_waveform_output()
     if ((waveform & 3) && (sid_model == MOS8580))
     {
         osc3 = tri_saw_pipeline & (no_pulse | pulse_output) & no_noise_or_noise_output;
-        tri_saw_pipeline = wave[ix];
+        //tri_saw_pipeline = wave[ix];
+        if ( ( waveform & 0b011 ) == 1 )
+        {
+            register unsigned int acc asm("r3") = ix << 12;
+            register unsigned int msb asm("r4") = acc & 0x800000;
+            tri_saw_pipeline = ( ( acc^ -!!msb ) >> 11 ) & 0xffe;
+        } else
+            tri_saw_pipeline = ix; 
     }
     else
     {
@@ -505,16 +546,37 @@ void WaveformGenerator::set_waveform_output()
   pulse_output = -((accumulator >> 12) >= pw) & 0xfff;
 }
 
-RESID_INLINE
+//RESID_INLINE
+__attribute__((always_inline)) inline
 void WaveformGenerator::set_waveform_output(cycle_count delta_t)
 {
   // Set output value.
   if (likely(waveform)) {
     // The bit masks no_pulse and no_noise are used to achieve branch-free
     // calculation of the output value.
-    int ix = (accumulator ^ (~sync_source->accumulator & ring_msb_mask)) >> 12;
-    waveform_output =
-      wave[ix] & (no_pulse | pulse_output) & no_noise_or_noise_output;
+    register int ix asm("r5")  = (accumulator ^ (~sync_source->accumulator & ring_msb_mask)) >> 12;
+
+    // CD
+    if ( ( waveform & 0b011 ) == 0 )
+    {
+        waveform_output = 0xfff;
+    } else
+    if ( ( waveform & 0b011 ) == 1 )
+    {
+        register unsigned int acc asm("r3") = ix << 12;
+        register unsigned int msb asm("r4") = acc & 0x800000;
+        waveform_output = ( ( acc ^ -!!msb ) >> 11 ) & 0xffe;
+    } else
+    if ( ( waveform & 0b011 ) == 2 )
+    {
+        waveform_output = ix;
+    } else
+        waveform_output = wave8[ ix ] << 4;
+
+    waveform_output &= ( no_pulse | pulse_output ) & no_noise_or_noise_output;
+            
+    //    waveform_output = wave[ix] & (no_pulse | pulse_output) & no_noise_or_noise_output;
+
     // Triangle/Sawtooth output delay for the 8580 is not modeled
     osc3 = waveform_output;
 
@@ -571,12 +633,22 @@ void WaveformGenerator::set_waveform_output(cycle_count delta_t)
 // done away with the bias part on the left hand side of the figure above.
 //
 
-RESID_INLINE
+//RESID_INLINE
+__attribute__((always_inline)) inline
 short WaveformGenerator::output()
 {
   // DAC imperfections are emulated by using waveform_output as an index
   // into a DAC lookup table. readOSC() uses waveform_output directly.
-  return model_dac[sid_model][waveform_output];
+    if ( sid_model == MOS6581 )
+    {
+        register int highp asm( "r3" ) = ( waveform_output >> 6 ) & 63;
+        return (short)model_dac0_8[ waveform_output & 63 ] + (short)model_dac1_8[ highp ] - 144 + highp * 64;
+    }
+
+  return waveform_output;
+
+//extern unsigned short model_dac[2][1 << 12];
+  //return model_dac[sid_model][waveform_output];
 }
 
 #endif // RESID_INLINING || defined(RESID_WAVE_CC)

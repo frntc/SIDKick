@@ -116,7 +116,7 @@ void ExternalFilter::clock(cycle_count delta_t, short Vi)
 
   // Maximum delta cycles for the external filter to work satisfactorily
   // is approximately 8.
-  cycle_count delta_t_flt = 8;
+  register cycle_count delta_t_flt asm( "r3" ) = 8;
 
   while (delta_t) {
     if (unlikely(delta_t < delta_t_flt)) {
@@ -128,8 +128,8 @@ void ExternalFilter::clock(cycle_count delta_t, short Vi)
     // Vhp = Vhp + w0hp*(Vlp - Vhp)*delta_t;
     // Vo  = Vlp - Vhp;
 
-    int dVlp = (w0lp_1_s7*delta_t_flt >> 3)*((Vi << 11) - Vlp) >> 4;
-    int dVhp = (w0hp_1_s17*delta_t_flt >> 3)*(Vlp - Vhp) >> 14;
+    register int dVlp asm( "r4" ) = (w0lp_1_s7*delta_t_flt >> 3)*((Vi << 11) - Vlp) >> 4;
+    register int dVhp asm( "r5" ) = (w0hp_1_s17*delta_t_flt >> 3)*(Vlp - Vhp) >> 14;
     Vlp += dVlp;
     Vhp += dVhp;
 
@@ -146,7 +146,7 @@ short ExternalFilter::output()
 {
   // Saturated arithmetics to guard against 16 bit sample overflow.
   const int half = 1 << 15;
-  int Vo = (Vlp - Vhp) >> 11;
+  register int Vo = (Vlp - Vhp) >> 11;
   if (Vo >= half) {
     Vo = half - 1;
   }
