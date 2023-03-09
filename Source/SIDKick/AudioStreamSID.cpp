@@ -40,6 +40,8 @@
 
 #define SAMPLERATE AUDIO_SAMPLE_RATE_EXACT
 
+#define CYCLE_COUNT_WRAP ( (3UL << 29 ) )
+
 // overwritten in SIDKick.ino according to auto detection
 unsigned int CLOCKFREQ = 985248;
 unsigned int CLOCKFREQ_NOMINAL = 985248;
@@ -81,6 +83,11 @@ uint8_t samActive = 0;
 #include "LED_Helpers.h"
 #endif
 
+#ifdef SID_DAC_MODE_SUPPORT
+extern uint8_t sidDACMode;
+int16_t sidCurDACValue = 0;
+#endif
+
 uint32_t samCurPos, samEndPos1, samStartPos2, samEndPos2;
 uint8_t samSpeaking = 0;
 
@@ -112,8 +119,12 @@ void AudioStreamSID::init()
   pOPL = ym3812_init( 3579545, SAMPLERATE );
   ym3812_reset_chip( pOPL );
   fmFakeOutput = 0;
-  hack_OPL_Sample_Value = 0;
+  hack_OPL_Sample_Value[ 0 ] = hack_OPL_Sample_Value[ 1 ] = 0;
   hack_OPL_Sample_Enabled = 0;
+  #endif
+
+  #ifdef SID_DAC_MODE_SUPPORT
+  sidCurDACValue = 0;
   #endif
   
   sid16_1->set_chip_model( MOS6581 );
@@ -144,6 +155,8 @@ void AudioStreamSID::init()
 
   sid_1->set_sampling_parameters( CLOCKFREQ, RESID_NAMESPACE::SAMPLE_FAST, AUDIO_SAMPLE_RATE_EXACT, AUDIO_SAMPLE_RATE_EXACT * SID_passband / 200.0f, SID_gain / 100.0f );
   sid_2->set_sampling_parameters( CLOCKFREQ, RESID_NAMESPACE::SAMPLE_FAST, AUDIO_SAMPLE_RATE_EXACT, AUDIO_SAMPLE_RATE_EXACT * SID_passband / 200.0f, SID_gain / 100.0f );
+  //sid_1->set_sampling_parameters( CLOCKFREQ, RESID_NAMESPACE::SAMPLE_INTERPOLATE, AUDIO_SAMPLE_RATE_EXACT, AUDIO_SAMPLE_RATE_EXACT * SID_passband / 200.0f, SID_gain / 100.0f );
+  //sid_2->set_sampling_parameters( CLOCKFREQ, RESID_NAMESPACE::SAMPLE_INTERPOLATE, AUDIO_SAMPLE_RATE_EXACT, AUDIO_SAMPLE_RATE_EXACT * SID_passband / 200.0f, SID_gain / 100.0f );
 #endif
 
   activeSID2 = activeSID2Prev = false;
@@ -484,8 +497,8 @@ __attribute__( ( always_inline ) ) inline uint32_t __UXTB16(const uint32_t op1)
   return(result);
 }
 
-static uint32_t totalCyclesPerBuffer = 0;
-static uint32_t nTotalCycleCounter = 0;
+//static uint32_t totalCyclesPerBuffer = 0;
+//static uint32_t nTotalCycleCounter = 0;
 
 FASTRUN void AudioStreamSID::update()
 {
@@ -539,7 +552,7 @@ FASTRUN void AudioStreamSID::update()
     int diff = (int)c64CycleCount - (int)nCyclesEmulated;
     static int nObservations = 0;
   
-    static int checkNextTime = 10;
+    const int checkNextTime = 10;
     if ( ++nObservations >= checkNextTime )
     {
       float dC = (float)lastDiff - (float)diff;
@@ -551,6 +564,15 @@ FASTRUN void AudioStreamSID::update()
       CLOCKFREQ = (int) ( F + 0.5f );
       lastDiff = diff;
       nObservations = 0;
+
+      // needs verification
+      if ( c64CycleCount > CYCLE_COUNT_WRAP )
+      {
+        c64CycleCount -= CYCLE_COUNT_WRAP / 2;
+        nCyclesEmulated -= CYCLE_COUNT_WRAP / 2;
+        for ( int i = ringRead; i < ringWrite; i++ )
+          ringTime[ i ] -= CYCLE_COUNT_WRAP / 2;
+      }
     }
   }
   #else
@@ -562,10 +584,14 @@ FASTRUN void AudioStreamSID::update()
       cyclesToEmulatePerRun += 3;
     if ( activeSID2 || activeFM )
       cyclesToEmulatePerRun = 22;
+    if ( activeSID2 && SID1_MODEL == 6581 && SID2_MODEL == 6581 && activeFM )
+      cyclesToEmulatePerRun = 26;
   #else
     int32_t cyclesToEmulatePerRun = 16;
     if ( activeSID2 || activeFM )
       cyclesToEmulatePerRun = 22;
+    if ( activeSID2 && SID1_MODEL == 6581 && SID2_MODEL == 6581 && activeFM )
+      cyclesToEmulatePerRun = 26;
   #endif
   #endif
 
@@ -639,7 +665,7 @@ FASTRUN void AudioStreamSID::update()
       if ( ringRead != ringWrite && nCyclesEmulated >= ringTime[ ringRead ] )
       {
       quicklyGetAnotherRegisterWrite:
-        register uint8_t A, D;D = ringBufGPIO[ ringRead ] & 255;A = (ringBufGPIO[ ringRead ] >> 8);
+        register uint8_t A = (ringBufGPIO[ ringRead ] >> 8), D = ringBufGPIO[ ringRead ] & 255;
 
         if ( ringBufGPIO[ ringRead ] == 0xffffffff ) // reset everything
         { reset(); } else
@@ -653,12 +679,22 @@ FASTRUN void AudioStreamSID::update()
               hack_OPL_Sample_Enabled = 1;  else
               hack_OPL_Sample_Enabled = 0;
           }
-          if ( hack_OPL_Sample_Enabled && pOPL->address == 0xa0 ) // enable digi hack
-            hack_OPL_Sample_Value = D; else
-            hack_OPL_Sample_Value = 0;
+          if ( hack_OPL_Sample_Enabled && ( pOPL->address == 0xa0 || pOPL->address == 0xa1 ) ) // digi hack
+          {
+            hack_OPL_Sample_Value[ pOPL->address - 0xa0 ] = D;
+          } else
+          {
+            hack_OPL_Sample_Value[ 0 ] = hack_OPL_Sample_Value[ 1 ] = 0;
+          }
           #endif
         } else
         {
+          #ifdef SID_DAC_MODE_SUPPORT
+          if ( sidDACMode == SID_DAC_MONO8 && ( A & 31 ) == 0x18 )
+          {
+            sidCurDACValue = ((int16_t)D - 128) << 8;
+          }
+          #endif
           if ( ringBufGPIO[ ringRead ] & (1<<21) ) // pseudo-stereo command?
           {
             if ( useSID16 )
@@ -756,7 +792,9 @@ FASTRUN void AudioStreamSID::update()
       ym3812_update_one( pOPL, &valOPL, 1 ); 
 
       if ( hack_OPL_Sample_Enabled )
-        valOPL = (uint16_t)hack_OPL_Sample_Value << 5;
+      {
+        valOPL = ((uint16_t)hack_OPL_Sample_Value[ 0 ] << 5) + ((uint16_t)hack_OPL_Sample_Value[ 1 ] << 5);
+      }
 
       // TODO asynchronous read back is an issue...
       //fmOutRegister = encodeGPIO( ym3812_read( pOPL, 0 ) ); 
@@ -858,9 +896,19 @@ FASTRUN void AudioStreamSID::update()
               hack_OPL_Sample_Enabled = 1;  else
               hack_OPL_Sample_Enabled = 0;
           }
-          if ( hack_OPL_Sample_Enabled && pOPL->address == 0xa0 ) // enable digi hack
+          if ( hack_OPL_Sample_Enabled && ( pOPL->address == 0xa0 || pOPL->address == 0xa1 ) ) // digi hack
+          {
+            hack_OPL_Sample_Value[ pOPL->address - 0xa0 ] = D;
+          } else
+          {
+            hack_OPL_Sample_Value[ 0 ] = hack_OPL_Sample_Value[ 1 ] = 0;
+          }
+          /*if ( hack_OPL_Sample_Enabled && pOPL->address == 0xa0 ) // digi hack
             hack_OPL_Sample_Value = D; else
             hack_OPL_Sample_Value = 0;
+          if ( hack_OPL_Sample_Enabled && pOPL->address == 0xa1 ) 
+            hack_OPL_Sample_Value2 = D; else
+            hack_OPL_Sample_Value2 = 0;*/
           #endif
         } else
         {
@@ -956,7 +1004,7 @@ FASTRUN void AudioStreamSID::update()
       ym3812_update_one( pOPL, &valOPL, 1 ); 
 
       if ( hack_OPL_Sample_Enabled )
-        valOPL = (uint16_t)hack_OPL_Sample_Value << 5;
+        valOPL = ( (uint16_t)hack_OPL_Sample_Value[ 0 ] << 5 ) + ( (uint16_t)hack_OPL_Sample_Value[ 1 ] << 5 );
 
       // TODO asynchronous read back is an issue...
       //fmOutRegister = encodeGPIO( ym3812_read( pOPL, 0 ) ); 
@@ -975,20 +1023,28 @@ FASTRUN void AudioStreamSID::update()
       left = right = 0;
     } else
     {
-      if ( useSID16 )
+      #ifdef SID_DAC_MODE_SUPPORT
+      if ( sidDACMode )
       {
-        sid1 = sid16_1->output();
-        if ( emulateSID2 && activeSID2 )
-          sid2 = sid16_2->output();
+        sid1 = sid2 = sidCurDACValue;
       } else
+      #endif
       {
-  #ifndef NO_RESID10
-        sid1 = sid_1->output();
-        if ( emulateSID2 && activeSID2 )
-          sid2 = sid_2->output();
-  #endif
+        if ( useSID16 )
+        {
+          sid1 = sid16_1->output();
+          if ( emulateSID2 && activeSID2 )
+            sid2 = sid16_2->output();
+        } else
+        {
+    #ifndef NO_RESID10
+          sid1 = sid_1->output();
+          if ( emulateSID2 && activeSID2 )
+            sid2 = sid_2->output();
+    #endif
+        }
       }
-
+      
       //left  = ( sid1 * cfgVolSID1_Left  + sid2 * cfgVolSID2_Left  + valOPL * cfgVolOPL_Left ) >> 8;
       //right = ( sid1 * cfgVolSID1_Right + sid2 * cfgVolSID2_Right + valOPL * cfgVolOPL_Right ) >> 8;
   
@@ -1074,8 +1130,8 @@ FASTRUN void AudioStreamSID::update()
 
 
 
-totalCyclesPerBuffer += nCyclesPerBuffer;
-nTotalCycleCounter ++;
+//totalCyclesPerBuffer += nCyclesPerBuffer;
+//nTotalCycleCounter ++;
 
 
 

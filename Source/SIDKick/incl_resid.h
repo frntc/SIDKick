@@ -1,6 +1,6 @@
 #define XSTR(x) #x
 #define STR(x) XSTR(x)
-#define LOCAL_SKETCH_DIR c:\work\code\arduino-1.8.13\resid\sidkick_v02_largerbuffer\SIDKick\
+#define LOCAL_SKETCH_DIR c:\ ... put your path here ... \SIDKick\
 
 #define HIGH_PRECISION_TABLES
 

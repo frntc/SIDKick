@@ -49,7 +49,16 @@
 #include "prgslots.h"   // memory for PRG-launcher
 
 
+#define globalRestPoolSize (120*1024)
+static uint32_t globalRestPoolOfs = 0;
+static unsigned char globalRestMemPool[ globalRestPoolSize ];
 
+void *allocPool( int size )
+{
+  void *p = (void*)&globalRestMemPool[ globalRestPoolOfs ];
+  globalRestPoolOfs += size;
+  return p;
+}
 
 uint32_t prgSize = 0;
 const uint8_t *prgCode = NULL;
@@ -70,7 +79,20 @@ static const char VERSION_STR_Flash[20] = {0x53, 0x49, 0x44, 0x4b, 0x09, 0x03, 0
 #endif
 #endif
 
-char VERSION_STR[20];
+// signature + version 0.21
+#define VERSION_STR_EXT_SIZE  16
+static const unsigned char VERSION_STR_ext[VERSION_STR_EXT_SIZE] = { 
+  0x53, 0x49, 0x44, 0x4b, 0x09, 0x03, 0x0b, 0x00,   // signature + extension version 0
+  0, 21,                                            // firmware version with stepping
+#ifdef SID_DAC_MODE_SUPPORT                         // support DAC modes? which?
+  1, 
+#else
+  0, 
+#endif
+  0, 0, 0, 0, 0 };
+
+// new +8 Bytes extended version information
+char VERSION_STR[20 + VERSION_STR_EXT_SIZE];
 
 const uint8_t portPinsC[ 5 ] PROGMEM = {  0, 24, 25, 26, 27 };                // A0..4 (GPIOs on port 6)
 const uint8_t portPinsD[ 8 ] PROGMEM = { 23, 22, 16, 17, 15, 14, 18, 19 };    // D0..7 (GPIOs on port 6)
@@ -112,6 +134,10 @@ uint32_t nCyclesEmulated;
 #define SID_ONLY_DISABLE  2
 #define SID_ONLY_ACTIVE   3
 uint8_t  sidOnlyMode = SID_ONLY_OFF;
+#endif
+
+#ifdef SID_DAC_MODE_SUPPORT
+uint8_t sidDACMode = SID_DAC_OFF;
 #endif
 
 uint8_t  addrLine = 0;
@@ -165,7 +191,7 @@ uint8_t midiAutoDetectStep = 0;
 static uint32_t clock2midi_Counter   = 0;
 static uint32_t midiIn_DetectedStartBitThreshold = 28;
 
-#define MIDI_RING_SIZE (64)
+#define MIDI_RING_SIZE (64*16)
 uint32_t MIDI_ringBuf[ MIDI_RING_SIZE ];
 uint32_t MIDI_ringTime[ MIDI_RING_SIZE ];
 uint16_t MIDI_ringWrite;
@@ -333,6 +359,7 @@ void setup()
 #endif
 
   memcpy( VERSION_STR, VERSION_STR_Flash, 20 );
+  memcpy( VERSION_STR + 20, VERSION_STR_ext, VERSION_STR_EXT_SIZE );
 
   cfgPRGCode = new unsigned char[ cfgPRGCode_size ];
   memcpy( cfgPRGCode, cfgPRGCode_Flash, cfgPRGCode_size );
@@ -412,6 +439,7 @@ void setup()
 
   dummy = prgDirectory[ 0 ];
   dummy = prgRepository[ 0 ];
+  memset( globalRestMemPool, 0, globalRestPoolSize );
 
   for ( uint32_t i = 0; i < cfgPRGCode_size; i++ )
     dummy = cfgPRGCode[ i ];
@@ -422,6 +450,16 @@ void setup()
 
   playSID->updateConfiguration( &stateConfig[ activeProfile * MAX_SETTINGS ], &stateConfig[ 10 * MAX_SETTINGS ] );
   memcpy( stateConfigPrevious, stateConfig, MAX_SETTINGS * 11 );
+
+#ifdef DEBUG_OUTPUT
+//dummyptr = new unsigned char[ SIZE ];
+//unsigned char globalRestMemPool[ 100000 ];
+
+const int SIZE = 60000;
+//memset( globalRestMemPool, 0, SIZE );
+  Serial.println( "malloc successful");
+
+#endif
 
   playSID->begin();
 
@@ -467,6 +505,9 @@ void resetEmulation()
     Serial.println( "[init] normal mode");
   }
   sidOnlyMode = SID_ONLY_OFF;
+#endif
+#ifdef SID_DAC_MODE_SUPPORT
+  sidDACMode = SID_DAC_OFF;
 #endif
 
   extern uint8_t firstBufferAfterReset;
@@ -975,6 +1016,9 @@ noSID_FM_MIDI_Commands_2:
   if ( !(data_7 & CORE_PIN32_BITMASK) ) // reset
   {
     sidOnlyMode = SID_ONLY_DISABLE;
+    #ifdef SID_DAC_MODE_SUPPORT
+    sidDACMode = SID_DAC_OFF;
+    #endif
     if ( doReset == 0 ) doReset = 1;
   } else 
   if ( doReset == 2 )
@@ -983,8 +1027,6 @@ noSID_FM_MIDI_Commands_2:
     c64CycleCountResetReleased = c64CycleCount;
   }
 
-handleLED_and_quit_FIQ_2:
-  if ( 0 ){};
   /*
           ___  __
     |    |__  |  \
@@ -1246,7 +1288,9 @@ FASTRUN void isrSID()
     busValueTTL --;
 
   if ( ( tasksToDo & 127 ) == 0 )
+  {
     goto noSID_FM_MIDI_Commands;
+  }
 
   /*
      __     __      __        __                     __               __
@@ -1386,7 +1430,8 @@ FASTRUN void isrSID()
         if ( A == 0x1d && stateInConfigMode > 0 )
         {
           if ( stateConfigRegisterAccess < 65536 )
-            writeDataPins( stateConfig[ stateConfigRegisterAccess ++ ] ); else if ( stateConfigRegisterAccess < 65536 + 16 )
+            writeDataPins( stateConfig[ stateConfigRegisterAccess ++ ] ); else 
+          if ( stateConfigRegisterAccess < 65536 + 16 + VERSION_STR_EXT_SIZE )
             writeDataPins( VERSION_STR[ stateConfigRegisterAccess - 65536 ] );
           stateInConfigMode = CONFIG_MODE_CYCLES;
         } else if ( A == 0x1c && stateReadDirectoryMode >= 0x1000 )
@@ -1473,6 +1518,15 @@ FASTRUN void isrSID()
           else if ( D == 0xfd )
           {
             sidOnlyMode = SID_ONLY_ENABLE;
+            stateInConfigMode = 
+            stateInTransferMode =
+            stateInVisualizationMode = 0;
+          }
+#endif
+#ifdef SID_DAC_MODE_SUPPORT
+          else if ( D == 0xfc )
+          {
+            sidDACMode = 1;
             stateInConfigMode = 
             stateInTransferMode =
             stateInVisualizationMode = 0;

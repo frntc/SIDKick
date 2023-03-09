@@ -74,7 +74,7 @@ private:
   #ifdef EMULATE_OPL2
   FM_OPL *pOPL;
   uint32_t fmOutRegister, fmFakeOutput;
-  uint8_t hack_OPL_Sample_Value;
+  uint8_t hack_OPL_Sample_Value[ 2 ];
   uint8_t hack_OPL_Sample_Enabled;
   #endif
 
