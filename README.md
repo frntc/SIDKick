@@ -45,7 +45,9 @@ Currently its features include:
 
 First of all, there are two variants of the PCB: for C64 longboards (v0.3 and v0.4, left in images above) and for C64 shortboards (v0.3s and v0.4s, right). I prepared the latter as the SIDKick+Teensy combination otherwise barely fits below the keyboard in flat C64c cases unless you use *low-profile sockets and pin headers* (1). All 4 PCB-versions fit into a C128; installation in a C128D requires removing a standoff below the power supply and gently lifting it (same as with other dual SID options).
 
-(1) **SIDKick height, space below keyboard in flat C64s**: it was brought to my attention that there are SIDKick-relocation-boards, but I recommend to avoid adapters and better use low-profile pin headers and sockets. This [photo by Jood on forum64.de](https://www.forum64.de/wcf/index.php?attachment/258967-pasted-from-clipboard-png/) shows how much height can be reduced. Possible headers/sockets include [preci-dip sockets](https://www.precidip.com/en/Products/PCB-Connectors/pview/315-PP-1NN-41-001101.html), [Mill-Max headers](https://www.mill-max.com/products/printed-circuit-board-pcb-pin/double-tail-header-pin/3169/3169-0-61-15-00-00-03-0), [Fischer Elektronik headers](https://www.fischerelektronik.de/web_fischer/en_GB/connectors/G01/Male%20headers/PR/MK_LP_41_/index.xhtml), and similar products.
+
+<img align="right"  height="160" src="https://raw.githubusercontent.com/frntc/SIDKick/master/Images/SIDKick_flat.jpg">
+(1) **SIDKick height, space below keyboard in flat C64s**: it was brought to my attention that there are SIDKick-relocation-boards, but I recommend to avoid adapters and better use low-profile pin headers and sockets. The photo on the right (courtesy of Jood) shows height reduction by low-profile sockets and pins. Possible headers/sockets include [preci-dip sockets](https://www.precidip.com/en/Products/PCB-Connectors/pview/315-PP-1NN-41-001101.html), [Mill-Max headers](https://www.mill-max.com/products/printed-circuit-board-pcb-pin/double-tail-header-pin/3169/3169-0-61-15-00-00-03-0), [Fischer Elektronik headers](https://www.fischerelektronik.de/web_fischer/en_GB/connectors/G01/Male%20headers/PR/MK_LP_41_/index.xhtml), and similar products.
 
 Of both variants there are two revisions: the latest one (v0.4) is a single-sided PCB using smaller IC footprints and provides easy-to-reach 3.3V and GND pins. Both revisions (v0.3 and v0.4) provide extension pins for the SAM button, MIDI, and LED-stripe extensions.
 
@@ -115,6 +117,10 @@ The photographs show various (other) locations where these signals can be tapped
 </p>
 
 The built-in configuration tool displays which cables have been (properly) installed and restricts the options (e.g. SID-addresses) to the available ones.
+
+### c64io
+
+The c64io is a project by Jood to conveniently provide all required signals for the SIDKick. It is a PCB put below the C64's CPU, mimicing a part of the PLA functionality to generate the signals. It can be found [here](https://www.forum64.de/index.php?thread/122108-kleines-projekt-c64-io).
 
 ### Audio Output
 <img align="right" width="160" height="160" src="https://raw.githubusercontent.com/frntc/SIDKick/master/Images/SIDKick_ortho.jpg">
