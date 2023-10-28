@@ -48,7 +48,7 @@ First of all, there are two variants of the PCB: for C64 longboards (v0.3 and v0
 
 <img align="right"  height="120" src="https://raw.githubusercontent.com/frntc/SIDKick/master/Images/SIDKick_flat.jpg">
 
-(1) **SIDKick height, space below keyboard in flat C64s**: it was brought to my attention that there are SIDKick-relocation-boards, but I recommend to avoid adapters and better use low-profile pin headers and sockets. The photo on the right (courtesy of Jood) shows height reduction by low-profile sockets and pins. Possible headers/sockets include [preci-dip sockets](https://www.precidip.com/en/Products/PCB-Connectors/pview/315-PP-1NN-41-001101.html), [Mill-Max headers](https://www.mill-max.com/products/printed-circuit-board-pcb-pin/double-tail-header-pin/3169/3169-0-61-15-00-00-03-0), [Fischer Elektronik headers](https://www.fischerelektronik.de/web_fischer/en_GB/connectors/G01/Male%20headers/PR/MK_LP_41_/index.xhtml), and similar products.
+(1) **SIDKick height, space below keyboard in flat C64s**: it was brought to my attention that there are SIDKick-relocation-boards, but I recommend to avoid adapters and better use low-profile pin headers and sockets. The photo on the right (courtesy of Jood) shows height reduction by low-profile sockets and pins. Possible headers/sockets include [Boom Precision Elec pinheaders](https://www.lcsc.com/product-detail/Pin-Headers_BOOMELE-Boom-Precision-Elec-C9742_C9742.html) (cheap), [Aliexpress](https://de.aliexpress.com/item/32219458766.html) (cheap), [preci-dip sockets](https://www.precidip.com/en/Products/PCB-Connectors/pview/315-PP-1NN-41-001101.html), [Mill-Max headers](https://www.mill-max.com/products/printed-circuit-board-pcb-pin/double-tail-header-pin/3169/3169-0-61-15-00-00-03-0), [Fischer Elektronik headers](https://www.fischerelektronik.de/web_fischer/en_GB/connectors/G01/Male%20headers/PR/MK_LP_41_/index.xhtml), and similar products.
 
 <br>
 
@@ -61,6 +61,16 @@ Here you can find the BOM and assembly information for
 [SIDKick v0.4](https://htmlpreview.github.io/?https://github.com/frntc/SIDKick/blob/main/BOM/BOM_SIDKick_v04.html), [SIDKick v0.4s](https://htmlpreview.github.io/?https://github.com/frntc/SIDKick/blob/main/BOM/BOM_SIDKick_v04s.html).
 
 If you plan to use the (lower quality) MQS-output only, you can skip all SMD-parts outside of the SID-/Teensy-sockets (C101-109, R101-107, U2, U6).
+
+### PCB ordering
+
+If you want to support my projects, feel free to order the PCBs from PCBWay:
+- [SIDKick 0.4](https://www.pcbway.com/project/shareproject/SIDKick_v04_PCB_Gerber_Files_360a9c79.html)
+- [SIDKick 0.4s](https://www.pcbway.com/project/shareproject/SIDKick_v04s_PCB_Gerber_Files_127b7616.html)
+- [MIDI breakout](https://www.pcbway.com/project/shareproject/SIDKick_MIDI_Breakout_Board_PCB_Gerber_Files_f3fba224.html)
+- If you don't have an account at PCBWay yet: [register via this link](https://pcbway.com/g/x1UjP0) and get "$5 of New User Free Credit".
+
+The Gerber files for PCB-production are also available in this repository if you want to order from another PCB manufacturer.
 
 ### Build instructions
 
