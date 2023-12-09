@@ -37,7 +37,7 @@
 // Teensy clock speed (keep 816 unless you deactivate MIDI and LED)
 #define TEENSY_CLOCK 816
 
-#define FIRMWARE_C128
+//#define FIRMWARE_C128
 
 // C128 does not support $D500 for SID #2
 // except for the C64-mode if:
@@ -50,7 +50,7 @@
 //#define SUPPORT_MIDI
 
 // define if WS2818b-LED support to be included in the firmware
-#define FANCY_LED
+//#define FANCY_LED
 
 // define this to use the sample generation routine which adapts to the actual C64/C128 clock 
 #define DYNAMIC_ADJUSTMENT_MIXER
@@ -63,7 +63,7 @@
 #define SID_DAC_OFF      0
 #define SID_DAC_MONO8    1
 #define SID_DAC_STEREO8  2
-#define SID_DAC_MONO16   3
-#define SID_DAC_STEREO16 4
+#define SID_DAC_MONO16   4
+#define SID_DAC_STEREO16 8
 
 //#define DEBUG_OUTPUT

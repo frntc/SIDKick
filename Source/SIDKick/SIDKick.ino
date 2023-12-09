@@ -67,25 +67,25 @@ const uint8_t *prgCode = NULL;
 
 #ifdef FIRMWARE_C128
 #if audioDevice == 1
-static const char VERSION_STR_Flash[20] = {0x53, 0x49, 0x44, 0x4b, 0x09, 0x03, 0x0b, '0', '.', '2', 0x44, 0x41, 0x43, '1', '2', '8' };
+static const char VERSION_STR_Flash[20] = {0x53, 0x49, 0x44, 0x4b, 0x09, 0x03, 0x0b, '0', '.', '2', 0x44, 0x41, 0x43, '1', '2', '8', 0, 0, 0, 0 };
 #else
-static const char VERSION_STR_Flash[20] = {0x53, 0x49, 0x44, 0x4b, 0x09, 0x03, 0x0b, '0', '.', '2', 0x4d, 0x51, 0x53, '1', '2', '8' };
+static const char VERSION_STR_Flash[20] = {0x53, 0x49, 0x44, 0x4b, 0x09, 0x03, 0x0b, '0', '.', '2', 0x4d, 0x51, 0x53, '1', '2', '8', 0, 0, 0, 0 };
 #endif
 #else
 #if audioDevice == 1
-static const char VERSION_STR_Flash[20] = {0x53, 0x49, 0x44, 0x4b, 0x09, 0x03, 0x0b, '0', '.', '2', '/', 0x44, 0x41, 0x43, '6', '4' };
+static const char VERSION_STR_Flash[20] = {0x53, 0x49, 0x44, 0x4b, 0x09, 0x03, 0x0b, '0', '.', '2', '/', 0x44, 0x41, 0x43, '6', '4', 0, 0, 0, 0 };
 #else
-static const char VERSION_STR_Flash[20] = {0x53, 0x49, 0x44, 0x4b, 0x09, 0x03, 0x0b, '0', '.', '2', '/', 0x4d, 0x51, 0x53, '6', '4' };
+static const char VERSION_STR_Flash[20] = {0x53, 0x49, 0x44, 0x4b, 0x09, 0x03, 0x0b, '0', '.', '2', '/', 0x4d, 0x51, 0x53, '6', '4', 0, 0, 0, 0 };
 #endif
 #endif
 
-// signature + version 0.21
+// signature + version 0.22
 #define VERSION_STR_EXT_SIZE  16
 static const unsigned char VERSION_STR_ext[VERSION_STR_EXT_SIZE] = { 
   0x53, 0x49, 0x44, 0x4b, 0x09, 0x03, 0x0b, 0x00,   // signature + extension version 0
-  0, 21,                                            // firmware version with stepping
+  0, 22,                                            // firmware version with stepping
 #ifdef SID_DAC_MODE_SUPPORT                         // support DAC modes? which?
-  1, 
+  SID_DAC_MONO8 | SID_DAC_STEREO8, 
 #else
   0, 
 #endif
@@ -139,6 +139,7 @@ uint8_t  sidOnlyMode = SID_ONLY_OFF;
 #ifdef SID_DAC_MODE_SUPPORT
 uint8_t sidDACMode = SID_DAC_OFF;
 #endif
+
 
 uint8_t  addrLine = 0;
 uint32_t fmFakeOutput = 0;
@@ -1526,7 +1527,14 @@ FASTRUN void isrSID()
 #ifdef SID_DAC_MODE_SUPPORT
           else if ( D == 0xfc )
           {
-            sidDACMode = 1;
+            sidDACMode = SID_DAC_MONO8;
+            stateInConfigMode = 
+            stateInTransferMode =
+            stateInVisualizationMode = 0;
+          }
+          else if ( D == 0xfb )
+          {
+            sidDACMode = SID_DAC_STEREO8;
             stateInConfigMode = 
             stateInTransferMode =
             stateInVisualizationMode = 0;
@@ -1615,7 +1623,7 @@ FASTRUN void isrSID()
         busValueTTL = 0xa2000; else // 8580
         busValueTTL = 0x1d00; // 6581
 
-      if ( A <= 24 )
+      if ( A <= 25 )
       {
         // pseudo stereo?
         if ( SID2_ADDR == (uint32_t)(1 << 31) )
@@ -1826,12 +1834,12 @@ noSID_FM_MIDI_Commands:
     newPotCounterX = newPotCounterY = 1;
   } else if ( potCycleCounter >= 256 )
   {
-    if ( newPotCounterX && (data_9 & CORE_PIN4_BITMASK) )
+    if ( newPotCounterX && ( (data_9 & CORE_PIN4_BITMASK) || potCycleCounter == 511 ) )
     {
       outRegisters[ 25 ] = potCycleCounter - 256;
       newPotCounterX = 0;
     }
-    if ( newPotCounterY && (data_9 & CORE_PIN5_BITMASK) )
+    if ( newPotCounterY && ( (data_9 & CORE_PIN5_BITMASK) || potCycleCounter == 511 ) )
     {
       outRegisters[ 26 ] = potCycleCounter - 256;
       newPotCounterY = 0;

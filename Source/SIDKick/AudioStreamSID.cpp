@@ -86,6 +86,7 @@ uint8_t samActive = 0;
 #ifdef SID_DAC_MODE_SUPPORT
 extern uint8_t sidDACMode;
 int16_t sidCurDACValue = 0;
+int16_t sidCurDACValueR = 0;
 #endif
 
 uint32_t samCurPos, samEndPos1, samStartPos2, samEndPos2;
@@ -125,12 +126,15 @@ void AudioStreamSID::init()
 
   #ifdef SID_DAC_MODE_SUPPORT
   sidCurDACValue = 0;
+  sidCurDACValueR = 0;
   #endif
   
   sid16_1->set_chip_model( MOS6581 );
   sid16_2->set_chip_model( MOS6581 );
   sid16_1->reset();
   sid16_2->reset();
+  sid16_1->input( 0 );
+  sid16_2->input( 0 );
   sid16_1->set_sampling_parameters( CLOCKFREQ, SAMPLE_INTERPOLATE, AUDIO_SAMPLE_RATE_EXACT );
   sid16_2->set_sampling_parameters( CLOCKFREQ, SAMPLE_INTERPOLATE, AUDIO_SAMPLE_RATE_EXACT );
   
@@ -261,10 +265,12 @@ void AudioStreamSID::updateConfiguration( uint8_t *cfg, uint8_t *globalCfg )
     {
       sid_1->set_voice_mask( 0x07 );
       sid_1->input( 0 );
+      sid16_1->input( 0 );
     } else
     {
       sid_1->set_voice_mask( 0x0f );
       sid_1->input( -(1<<cfg[1]) );
+      sid16_1->input( -(1<<cfg[1]) );
     }
 #endif
   }
@@ -289,10 +295,12 @@ void AudioStreamSID::updateConfiguration( uint8_t *cfg, uint8_t *globalCfg )
       {
         sid_2->set_voice_mask( 0x07 );
         sid_2->input( 0 );
+        sid16_2->input( 0 );
       } else
       {
         sid_2->set_voice_mask( 0x0f );
         sid_2->input( -(1<<cfg[9]) );
+        sid16_2->input( -(1<<cfg[9]) );
       }
 #endif
   } else
@@ -690,6 +698,13 @@ FASTRUN void AudioStreamSID::update()
         } else
         {
           #ifdef SID_DAC_MODE_SUPPORT
+          if ( sidDACMode == SID_DAC_STEREO8 )
+          {
+            if ( ( A & 31 ) == 0x18 )
+              sidCurDACValue = ((int16_t)D - 128) << 8; 
+            if ( ( A & 31 ) == 0x19 )
+              sidCurDACValueR = ((int16_t)D - 128) << 8; 
+          }
           if ( sidDACMode == SID_DAC_MONO8 && ( A & 31 ) == 0x18 )
           {
             sidCurDACValue = ((int16_t)D - 128) << 8;
@@ -1024,9 +1039,16 @@ FASTRUN void AudioStreamSID::update()
     } else
     {
       #ifdef SID_DAC_MODE_SUPPORT
-      if ( sidDACMode )
+      if ( sidDACMode == SID_DAC_MONO8 )
       {
-        sid1 = sid2 = sidCurDACValue;
+        left = right = sidCurDACValue;
+        goto skipMixer;
+      } else
+      if ( sidDACMode == SID_DAC_STEREO8 )
+      {
+        left = sidCurDACValue;
+        right = sidCurDACValueR;
+        goto skipMixer;
       } else
       #endif
       {
@@ -1058,7 +1080,7 @@ FASTRUN void AudioStreamSID::update()
       asm volatile ( "SMLABB %0, %1, %2, %3" : "=r" (right) : "r" (valOPL), "r" (actVolOPL_Right), "r" (right) );
       right >>= 8;
       
-  
+skipMixer:  
       if ( samSpeaking )
       {
         int32_t sam = ( (int32_t)(*(int8_t*)&samvoice_raw[ samCurPos >> 1 ]) * samActive ) << 2;
