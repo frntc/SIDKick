@@ -6,7 +6,9 @@
 
 SIDKick is a versatile sound device for C64s and C128s: it serves as a drop-in replacement for the SID 6581/8580 sound chips, and at the same time provides Sound Expander-emulation (Yamaha OPL-based FM sound), a MIDI interface and can control LED stripes. It is based on a Teensy 4.1 and makes no compromises with regard to quality: the emulation is based on reSID and fmOPL. It also comes with a few extras.
 
-Currently its features include:
+*Note SIDKick got a small brother! [SIDKick pico](https://github.com/frntc/SIDKick-pico) is based on the Raspberry Pi Pico board which has much better availability and lower price point than the Teensy 4.1.*
+
+Currently SIDKick features include:
 -	dual 6581 and/or 8580 emulation based on reSID 0.16 or reSID 1.0 (configurable)
 -	2nd-SID address at $d400, $d420, $d500, $d420 + $d500 simultaneously, $de00, $df00
 -	Sound Expander/FM emulation based on fmOPL (at $df00), support for OPL sample playing technique
