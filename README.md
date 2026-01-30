@@ -253,7 +253,9 @@ The Teensy handles all timing-critical communication protocols, i.e. C64/C128 bu
   
 ## Disclaimer
 
+I'm a hobbyist, no electronics engineer. I'm doing my best to ensure that my projects are working at intended, but I cannot give any guarantee for anything. I am not a manufacturer or distributor, so you must ensure yourself that operation is permitted in your place of residence. 
 Be careful not to damage your Teensy, PC, or Commodore, or anything attached to it. I am not responsible if you or your hardware gets damaged. Keep in mind that the Teensy is typically overclocked. If you don't know what you're doing, better don't... use everything at your own risk.
+
 
 <br />
   
